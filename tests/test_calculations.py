@@ -5,6 +5,7 @@ import math
 import pandas as pd
 import pytest
 
+from src.data import validate_prices
 from src.grading import build_report_card, letter_grade, score_metric
 from src.metrics import annualized_return, beta, max_drawdown
 
@@ -51,3 +52,21 @@ def test_report_card_handles_missing_data():
     assert card["categories"]["Risk"]["grade"] == "A"
     assert card["categories"]["Growth"]["grade"] == "N/A"
     assert card["overall_grade"] == "A"  # only categories with data count
+
+
+def test_validate_prices_rejects_stock_that_stopped_trading():
+    # Like EA, whose last trade on Yahoo Finance was months ago.
+    prices = make_prices([100.0] * 100, start="2026-01-01")
+    with pytest.raises(ValueError, match="hasn't traded since"):
+        validate_prices(prices, "OLD", today=pd.Timestamp("2026-10-14"))
+
+
+def test_validate_prices_rejects_too_little_history():
+    prices = make_prices([100.0] * 5, start="2026-10-08")
+    with pytest.raises(ValueError, match="Only 5 days"):
+        validate_prices(prices, "NEW", today=pd.Timestamp("2026-10-14"))
+
+
+def test_validate_prices_accepts_normal_stock():
+    prices = make_prices([100.0] * 100, start="2026-07-06")
+    validate_prices(prices, "OK", today=pd.Timestamp("2026-10-14"))

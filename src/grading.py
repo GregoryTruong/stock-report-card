@@ -80,7 +80,7 @@ def letter_grade(score):
 
 def summary_for(category, score):
     if score is None:
-        return "Not enough data (common for ETFs and funds)."
+        return "Yahoo Finance doesn't have this data (common for funds and ETFs)."
     high, mid, low = SUMMARIES[category]
     if score >= 65:
         return high

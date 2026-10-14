@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from src.data import MARKET_TICKER, get_company_info, get_price_history
+from src.data import MARKET_TICKER, get_company_info, get_price_history, search_tickers
 from src.grading import CATEGORIES, build_report_card
 from src.metrics import annualized_volatility, collect_metrics, drawdown_series, growth_of_10k
 from src import ui
@@ -14,7 +14,7 @@ st.html(ui.CSS)
 # Ready-made groups of tickers so people can explore without knowing symbols.
 PRESETS = {
     "Car makers": ["TSLA", "F", "GM", "TM", "RIVN", "HMC"],
-    "Gaming": ["NVDA", "AMD", "SONY", "EA", "TTWO", "RBLX"],
+    "Gaming": ["NVDA", "AMD", "SONY", "NTDOY", "TTWO", "RBLX"],
     "Big tech": ["AAPL", "MSFT", "GOOGL", "AMZN", "META"],
     "Everyday brands": ["KO", "PEP", "PG", "WMT", "MCD", "NKE"],
 }
@@ -32,10 +32,26 @@ def load_stock(ticker: str, period: str):
     return info, prices, market_prices, metrics, build_report_card(metrics)
 
 
+@st.cache_data(ttl=86400, show_spinner=False)
+def find_stocks(query: str):
+    """Search by company name or ticker. Exact ticker matches go first.
+
+    Yahoo's search hides stocks that stopped trading (like EA), so if the query
+    looks like a ticker we always try it directly. That way the user gets a real
+    explanation instead of a different company with a similar name.
+    """
+    matches = search_tickers(query)
+    symbol = query.upper()
+    looks_like_ticker = " " not in symbol and len(symbol) <= 10
+    if looks_like_ticker and symbol not in {m["symbol"].upper() for m in matches}:
+        matches.insert(0, {"symbol": symbol, "name": "", "exchange": ""})
+    return sorted(matches, key=lambda m: m["symbol"].upper() != symbol)
+
+
 def use_preset_ticker():
-    """When a quick-pick ticker is clicked, put it in the ticker box."""
+    """When a quick-pick ticker is clicked, put it in the search box."""
     if st.session_state.quick_pick:
-        st.session_state.ticker = st.session_state.quick_pick
+        st.session_state.query = st.session_state.quick_pick
 
 
 def use_preset_group():
@@ -58,20 +74,38 @@ with st.sidebar:
 
 # -------------------------------------------------------------- Report card
 def report_card_page():
-    if "ticker" not in st.session_state:
-        st.session_state.ticker = "AAPL"
+    if "query" not in st.session_state:
+        st.session_state.query = "AAPL"
 
     search, picks = st.columns([1, 2], vertical_alignment="bottom")
     with search:
-        st.text_input("Ticker symbol", key="ticker", placeholder="e.g. AAPL")
+        st.text_input("Search a company or ticker", key="query",
+                      placeholder="e.g. Aritzia or AAPL")
     with picks:
         group = st.selectbox("Browse", list(PRESETS), label_visibility="collapsed")
     st.pills("Quick picks", PRESETS[group], key="quick_pick", on_change=use_preset_ticker,
              label_visibility="collapsed")
 
-    ticker = st.session_state.ticker.strip().upper()
-    if not ticker:
+    query = st.session_state.query.strip()
+    if not query:
         return
+    try:
+        matches = find_stocks(query)
+    except Exception:
+        matches = []
+    if not matches:
+        st.warning(f'No stocks found for "{query}". Try the full company name or a ticker.')
+        return
+    if len(matches) > 1:
+        pick = st.selectbox(
+            "Matches", range(len(matches)),
+            format_func=lambda i: " · ".join(
+                x for x in (matches[i]["symbol"], matches[i]["name"], matches[i]["exchange"]) if x),
+        )
+    else:
+        pick = 0
+    ticker = matches[pick]["symbol"]
+
     try:
         with st.spinner(f"Loading {ticker}..."):
             info, prices, market_prices, metrics, card = load_stock(ticker, period)
@@ -82,10 +116,12 @@ def report_card_page():
     day_change = prices.iloc[-1] / prices.iloc[-2] - 1
     subtitle = " · ".join(x for x in (info.get("sector"), info.get("industry")) if x) or "Fund"
     st.html(ui.header_html(info.get("longName", ticker), ticker, subtitle,
-                           prices.iloc[-1], day_change))
+                           prices.iloc[-1], day_change, info.get("currency", "USD")))
 
     stats = st.columns(4)
-    stats[0].metric("Market cap", ui.format_large_number(info.get("marketCap")))
+    currency = info.get("currency", "USD")
+    cap_label = "Market cap" if currency == "USD" else f"Market cap ({currency})"
+    stats[0].metric(cap_label, ui.format_large_number(info.get("marketCap"), currency))
     stats[1].metric(f"Yearly return ({period_label})", f"{metrics['annual_return']:.1%}",
                     delta=f"{metrics['annual_return'] - metrics['market_annual_return']:+.1%} vs market")
     stats[2].metric("Max drop", f"{metrics['max_drawdown']:.0%}")
@@ -126,7 +162,9 @@ def compare_page():
         st.session_state.compare_input = ", ".join(PRESETS["Car makers"])
 
     st.header("Compare stocks")
-    st.text_input("Tickers, separated by commas", key="compare_input")
+    st.text_input("Tickers, separated by commas", key="compare_input",
+                  help="Non-US stocks need their exchange suffix, like ATZ.TO for Aritzia. "
+                       "Search by name on the Report card page to find it.")
     st.pills("Load a group", list(PRESETS), key="compare_group", on_change=use_preset_group)
 
     tickers = [t.strip().upper() for t in st.session_state.compare_input.split(",") if t.strip()]
@@ -135,8 +173,8 @@ def compare_page():
         for t in dict.fromkeys(tickers + [MARKET_TICKER]):  # dedupe, keep order, add the market
             try:
                 info, prices, _, metrics, card = load_stock(t, period)
-            except Exception:
-                st.warning(f"Skipped {t}: couldn't load data.")
+            except Exception as error:
+                st.warning(f"Skipped {t}: {error}")
                 continue
             row = {"Ticker": t, "Company": info.get("shortName", t),
                    "Overall": card["overall_grade"], "Score": card["overall_score"] or 0}

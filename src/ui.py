@@ -56,7 +56,12 @@ def grade_chip(grade: str, large: bool = False) -> str:
     return f'<span class="rc-chip{size}" style="color:{text};background:{background}">{grade}</span>'
 
 
-def header_html(name, ticker, subtitle, price, change) -> str:
+def format_price(value, currency="USD") -> str:
+    """$12.34 for US dollars, otherwise 12.34 CAD (or whatever the currency is)."""
+    return f"${value:,.2f}" if currency == "USD" else f"{value:,.2f} {currency}"
+
+
+def header_html(name, ticker, subtitle, price, change, currency="USD") -> str:
     color = GAIN_COLOR if change >= 0 else LOSS_COLOR
     sign = "+" if change >= 0 else ""
     return f"""
@@ -66,7 +71,7 @@ def header_html(name, ticker, subtitle, price, change) -> str:
         <div class="rc-sub">{html.escape(ticker)} · {html.escape(subtitle)}</div>
       </div>
       <div>
-        <div class="rc-price">${price:,.2f}</div>
+        <div class="rc-price">{format_price(price, currency)}</div>
         <div class="rc-change" style="color:{color}">{sign}{change:.2%} today</div>
       </div>
     </div>"""
@@ -107,13 +112,16 @@ def grade_cell_style(grade) -> str:
     return f"color: {text}; background-color: {background}; font-weight: 600"
 
 
-def format_large_number(value) -> str:
+def format_large_number(value, currency="USD") -> str:
     if not value:
         return "-"
     for limit, suffix in ((1e12, "T"), (1e9, "B"), (1e6, "M")):
         if abs(value) >= limit:
-            return f"${value / limit:.2f}{suffix}"
-    return f"${value:,.0f}"
+            number = f"{value / limit:.2f}{suffix}"
+            break
+    else:
+        number = f"{value:,.0f}"
+    return f"${number}" if currency == "USD" else number
 
 
 def _style(fig: go.Figure, height: int = 360) -> go.Figure:

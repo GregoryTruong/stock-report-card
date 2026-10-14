@@ -1,6 +1,7 @@
 # Stock Report Card
 
-A web app that grades any stock from **A to F** on four things analysts look at
+A web app that grades any stock on Yahoo Finance (search by company name, including non-US
+stocks like Aritzia on the Toronto exchange) from **A to F** on four things analysts look at
 (**growth, profitability, valuation, and risk**) and compares it to the S&P 500.
 
 Most student stock projects try to *predict* prices, which even professionals can't
