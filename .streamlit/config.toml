@@ -1,0 +1,20 @@
+# App-wide look: colors, fonts and toolbar. Streamlit reads this automatically.
+
+[theme]
+base = "light"
+primaryColor = "#0F766E"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F5F7"
+textColor = "#16181D"
+borderColor = "#DFE2E6"
+showWidgetBorder = true
+baseRadius = "6px"
+font = "IBM Plex Sans:https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+codeFont = "IBM Plex Mono:https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap"
+headingFontWeights = 600
+
+[theme.sidebar]
+backgroundColor = "#F4F5F7"
+
+[client]
+toolbarMode = "minimal"
