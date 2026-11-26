@@ -1,20 +1,21 @@
 # App-wide look: colors, fonts and toolbar. Streamlit reads this automatically.
+# A dark "late-night dashboard" theme: near-black background with electric blue accents.
 
 [theme]
-base = "light"
-primaryColor = "#0F766E"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F4F5F7"
-textColor = "#16181D"
-borderColor = "#DFE2E6"
+base = "dark"
+primaryColor = "#3B82F6"
+backgroundColor = "#0B0F17"
+secondaryBackgroundColor = "#131A26"
+textColor = "#E6EAF2"
+borderColor = "#1E293B"
 showWidgetBorder = true
-baseRadius = "6px"
+baseRadius = "10px"
 font = "IBM Plex Sans:https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
-codeFont = "IBM Plex Mono:https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap"
-headingFontWeights = 600
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap"
+headingFontWeights = 700
 
 [theme.sidebar]
-backgroundColor = "#F4F5F7"
+backgroundColor = "#0E131D"
 
 [client]
 toolbarMode = "minimal"

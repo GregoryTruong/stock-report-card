@@ -8,7 +8,7 @@ from src.data import MARKET_TICKER, get_company_info, get_price_history, rank_ma
 from src.grading import CATEGORIES, build_report_card
 from src.metrics import collect_metrics, drawdown_series, growth_of_10k
 
-st.set_page_config(page_title="Stock Report Card", layout="wide")
+st.set_page_config(page_title="Stock Report Card", page_icon="📈", layout="wide")
 st.html(ui.CSS)
 
 # Ready-made groups of tickers so people can explore without knowing symbols.
@@ -63,8 +63,9 @@ def use_preset_group():
 
 # ------------------------------------------------------------------ Sidebar
 with st.sidebar:
-    st.markdown("### Stock Report Card")
-    page = st.radio("Page", ["Report card", "Compare", "Methodology"],
+    st.markdown("### 📈 Stock Report Card")
+    page_icons = {"Report card": "🎓", "Compare": "⚔️", "Methodology": "📐"}
+    page = st.radio("Page", list(page_icons), format_func=lambda p: f"{page_icons[p]}  {p}",
                     label_visibility="collapsed")
     st.divider()
     period_label = st.segmented_control("Time period", list(PERIODS), default="5Y",
@@ -78,6 +79,7 @@ def report_card_page():
     if "query" not in st.session_state:
         st.session_state.query = "AAPL"
 
+    st.html(ui.hero_html())
     search, picks = st.columns([1, 2], vertical_alignment="bottom")
     with search:
         st.text_input("Search a company or ticker", key="query",
@@ -117,16 +119,17 @@ def report_card_page():
     st.html(ui.header_html(info.get("longName") or ticker, ticker, subtitle,
                            prices.iloc[-1], day_change, currency))
 
-    stats = st.columns(4)
+    excess = metrics["annual_return"] - metrics["market_annual_return"]
     cap_label = "Market cap" if currency == "USD" else f"Market cap ({currency})"
-    stats[0].metric(cap_label, ui.format_large_number(info.get("marketCap"), currency))
-    stats[1].metric(f"Yearly return ({period_label})", f"{metrics['annual_return']:.1%}",
-                    delta=f"{metrics['annual_return'] - metrics['market_annual_return']:+.1%} vs market")
-    stats[2].metric("Max drop", f"{metrics['max_drawdown']:.0%}")
-    stats[3].metric("Beta", f"{metrics['beta']:.2f}",
-                    help="1.0 moves with the market, 2.0 moves twice as much.")
+    st.html(ui.stats_html([
+        (cap_label, ui.format_large_number(info.get("marketCap"), currency), None, True),
+        (f"Yearly return · {period_label}", f"{metrics['annual_return']:.1%}",
+         f"{excess:+.1%} vs S&P 500", excess >= 0),
+        ("Worst drop", f"{metrics['max_drawdown']:.0%}", None, True),
+        ("Beta", f"{metrics['beta']:.2f}",
+         "calmer than market" if metrics["beta"] < 1 else "swings more than market", metrics["beta"] < 1),
+    ]))
 
-    st.subheader("Report card")
     st.html(ui.scorecard_html(card))
 
     with st.expander("See every metric behind the grades"):
@@ -142,7 +145,7 @@ def report_card_page():
         )
 
     st.subheader("Performance")
-    growth_tab, drawdown_tab = st.tabs(["Growth of $10,000", "Drops from peak"])
+    growth_tab, drawdown_tab = st.tabs(["📈 Growth of $10,000", "📉 Drops from peak"])
     with growth_tab:
         st.plotly_chart(
             ui.growth_chart(growth_of_10k(prices), growth_of_10k(market_prices), ticker),
@@ -177,6 +180,7 @@ def compare_page():
             row = {"Ticker": t, "Company": info.get("shortName") or t,
                    "Overall": card["overall_grade"], "Score": card["overall_score"] or 0}
             row.update({name: c["grade"] for name, c in card["categories"].items()})
+            row.update({f"{name} score": c["score"] for name, c in card["categories"].items()})
             row["Yearly return"] = metrics["annual_return"]
             row["Volatility"] = metrics["volatility"]
             rows.append(row)
@@ -187,8 +191,10 @@ def compare_page():
     ranked = table[table["Ticker"] != MARKET_TICKER].sort_values("Score", ascending=False)
 
     grade_columns = ["Overall", *CATEGORIES]
+    st.html(ui.podium_html(ranked))
+    score_columns = [f"{name} score" for name in CATEGORIES]
     st.dataframe(
-        ranked.style.map(ui.grade_cell_style, subset=grade_columns),
+        ranked.drop(columns=score_columns).style.map(ui.grade_cell_style, subset=grade_columns),
         hide_index=True, use_container_width=True,
         column_config={
             "Score": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.0f"),
@@ -203,6 +209,11 @@ def compare_page():
                "market with less risk.")
     st.plotly_chart(ui.risk_return_chart(table), use_container_width=True)
 
+    st.subheader("Strengths at a glance")
+    st.caption("Each shape shows a stock's four category scores. The bigger the shape, the better "
+               "the all-round grade. Click names in the legend to hide or show them.")
+    st.plotly_chart(ui.radar_chart(ranked, list(CATEGORIES)), use_container_width=True)
+
 
 # -------------------------------------------------------------- Methodology
 def methodology_page():
@@ -214,15 +225,7 @@ Each metric gets a **score from 0 to 100** based on where it falls between a
 the overall grade is the average of the four categories.
 """
     )
-    st.html(
-        '<table class="rc-card"><tr><th>Grade</th><th>Score</th></tr>'
-        + "".join(
-            f"<tr><td>{ui.grade_chip(g)}</td><td>{s}</td></tr>"
-            for g, s in (("A", "80 and up"), ("B", "65 to 79"), ("C", "50 to 64"),
-                         ("D", "35 to 49"), ("F", "Under 35"))
-        )
-        + "</table>"
-    )
+    st.html(ui.grade_table_html())
     rows = [
         {"Category": name, "Metric": label,
          "Worst (score 0)": worst, "Best (score 100)": best,
