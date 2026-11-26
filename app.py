@@ -11,7 +11,7 @@ from src.data import MARKET_TICKER, get_company_info, get_price_history, rank_ma
 from src.grading import CATEGORIES, build_report_card
 from src.metrics import collect_metrics, drawdown_series, growth_of_10k
 
-st.set_page_config(page_title="Stock Report Card", page_icon="📈", layout="wide")
+st.set_page_config(page_title="Stock Report Card", page_icon=":material/monitoring:", layout="wide")
 
 
 def current_theme() -> str:
@@ -47,7 +47,8 @@ PRESETS = {
     "Everyday brands": ["KO", "PEP", "PG", "WMT", "MCD", "NKE"],
 }
 PERIODS = {"1Y": "1y", "3Y": "3y", "5Y": "5y", "10Y": "10y"}
-PAGES = {"Report card": "🎓", "Compare": "⚔️", "Methodology": "📐"}
+PAGES = {"Report card": ":material/grading:", "Compare": ":material/compare_arrows:",
+         "Methodology": ":material/functions:"}
 
 # The page, search and time period live in the URL (e.g. ?page=Compare&q=TSLA),
 # so links can be shared and switching themes doesn't lose your place.
@@ -102,7 +103,7 @@ def use_preset_group():
 
 # ------------------------------------------------------------------ Sidebar
 with st.sidebar:
-    st.markdown("### 📈 Stock Report Card")
+    st.markdown("### :material/monitoring: Stock Report Card")
     page = st.radio("Page", list(PAGES), key="page", format_func=lambda p: f"{PAGES[p]}  {p}",
                     label_visibility="collapsed")
     st.divider()
@@ -110,7 +111,7 @@ with st.sidebar:
                                         help="Used for the risk metrics and the charts.")
     period = PERIODS.get(period_label or "5Y")
     st.divider()
-    dark_mode = st.toggle("🌙 Dark mode", value=THEME == "dark")
+    dark_mode = st.toggle(":material/dark_mode: Dark mode", value=THEME == "dark")
     if dark_mode != (THEME == "dark"):
         switch_theme("dark" if dark_mode else "light")
     st.caption("For learning purposes only. Not financial advice.")
@@ -186,7 +187,8 @@ def report_card_page():
         )
 
     st.subheader("Performance")
-    growth_tab, drawdown_tab = st.tabs(["📈 Growth of $10,000", "📉 Drops from peak"])
+    growth_tab, drawdown_tab = st.tabs([":material/show_chart: Growth of $10,000",
+                                         ":material/trending_down: Drops from peak"])
     with growth_tab:
         st.plotly_chart(
             ui.growth_chart(growth_of_10k(prices), growth_of_10k(market_prices), ticker),
