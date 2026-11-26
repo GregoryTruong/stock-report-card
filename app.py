@@ -1,7 +1,10 @@
 """Stock Report Card: the web app. Run it with:  streamlit run app.py"""
 
+import json
+
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from src import ui
 from src.data import MARKET_TICKER, get_company_info, get_price_history, rank_matches, search_tickers
@@ -9,7 +12,32 @@ from src.grading import CATEGORIES, build_report_card
 from src.metrics import collect_metrics, drawdown_series, growth_of_10k
 
 st.set_page_config(page_title="Stock Report Card", page_icon="📈", layout="wide")
-st.html(ui.CSS)
+
+
+def current_theme() -> str:
+    """"dark" or "light": whichever theme Streamlit is showing this visitor."""
+    theme_type = getattr(getattr(st.context, "theme", None), "type", None)
+    return theme_type if theme_type in ("dark", "light") else "dark"
+
+
+def switch_theme(mode: str):
+    """Flip Streamlit's theme by saving the choice where Streamlit looks for it, then reloading.
+
+    Streamlit has no Python call to change the theme, but it remembers each
+    visitor's pick in the browser's localStorage. The page, ticker and time
+    period are kept in the URL, so the reload lands right back where you were.
+    """
+    choice = json.dumps("Dark" if mode == "dark" else "Light")
+    components.html(f"""<script>
+      const w = window.parent;
+      w.localStorage.setItem(`stActiveTheme-${{w.location.pathname}}-v2`, JSON.stringify({choice}));
+      w.location.reload();
+    </script>""", height=0)
+
+
+THEME = current_theme()
+ui.set_theme(THEME)
+st.html(ui.css())
 
 # Ready-made groups of tickers so people can explore without knowing symbols.
 PRESETS = {
@@ -19,6 +47,17 @@ PRESETS = {
     "Everyday brands": ["KO", "PEP", "PG", "WMT", "MCD", "NKE"],
 }
 PERIODS = {"1Y": "1y", "3Y": "3y", "5Y": "5y", "10Y": "10y"}
+PAGES = {"Report card": "🎓", "Compare": "⚔️", "Methodology": "📐"}
+
+# The page, search and time period live in the URL (e.g. ?page=Compare&q=TSLA),
+# so links can be shared and switching themes doesn't lose your place.
+params = st.query_params
+if "query" not in st.session_state:
+    st.session_state.query = params.get("q", "AAPL")
+if "page" not in st.session_state:
+    st.session_state.page = params.get("page") if params.get("page") in PAGES else "Report card"
+if "period_label" not in st.session_state:
+    st.session_state.period_label = params.get("period") if params.get("period") in PERIODS else "5Y"
 
 
 # st.cache_data saves results for an hour so we don't re-download
@@ -64,21 +103,23 @@ def use_preset_group():
 # ------------------------------------------------------------------ Sidebar
 with st.sidebar:
     st.markdown("### 📈 Stock Report Card")
-    page_icons = {"Report card": "🎓", "Compare": "⚔️", "Methodology": "📐"}
-    page = st.radio("Page", list(page_icons), format_func=lambda p: f"{page_icons[p]}  {p}",
+    page = st.radio("Page", list(PAGES), key="page", format_func=lambda p: f"{PAGES[p]}  {p}",
                     label_visibility="collapsed")
     st.divider()
-    period_label = st.segmented_control("Time period", list(PERIODS), default="5Y",
+    period_label = st.segmented_control("Time period", list(PERIODS), key="period_label",
                                         help="Used for the risk metrics and the charts.")
     period = PERIODS.get(period_label or "5Y")
+    st.divider()
+    dark_mode = st.toggle("🌙 Dark mode", value=THEME == "dark")
+    if dark_mode != (THEME == "dark"):
+        switch_theme("dark" if dark_mode else "light")
     st.caption("For learning purposes only. Not financial advice.")
+
+st.query_params.update(page=page, period=period_label or "5Y", q=st.session_state.query)
 
 
 # -------------------------------------------------------------- Report card
 def report_card_page():
-    if "query" not in st.session_state:
-        st.session_state.query = "AAPL"
-
     st.html(ui.hero_html())
     search, picks = st.columns([1, 2], vertical_alignment="bottom")
     with search:

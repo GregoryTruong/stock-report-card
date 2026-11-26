@@ -45,3 +45,25 @@ def test_radar_skips_stocks_with_missing_categories():
     ])
     fig = radar_chart(table, ["Growth", "Risk"])
     assert [trace.name for trace in fig.data] == ["FULL"]
+
+
+def test_light_theme_swaps_colors_only_for_this_thread():
+    import threading
+
+    from src import ui
+
+    seen = {}
+
+    def other_visitor():
+        seen["other"] = ui.grade_color("A")  # a new thread starts on the dark palette
+
+    ui.set_theme("light")
+    try:
+        assert ui.grade_color("A") == ui.THEMES["light"]["GRADE_COLORS"]["A"]
+        assert ui.THEMES["light"]["BG"] in ui.css()
+        thread = threading.Thread(target=other_visitor)
+        thread.start()
+        thread.join()
+        assert seen["other"] == ui.THEMES["dark"]["GRADE_COLORS"]["A"]
+    finally:
+        ui.set_theme("dark")
