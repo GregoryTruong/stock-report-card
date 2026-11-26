@@ -1,5 +1,7 @@
 # Stock Report Card
 
+[![Tests](https://github.com/GregoryTruong/stock-report-card/actions/workflows/tests.yml/badge.svg)](https://github.com/GregoryTruong/stock-report-card/actions/workflows/tests.yml)
+
 A web app that grades any stock on Yahoo Finance (search by company name, including non-US
 stocks like Aritzia on the Toronto exchange) from **A to F** on four things analysts look at
 (**growth, profitability, valuation, and risk**) and compares it to the S&P 500.
@@ -59,7 +61,8 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Run the tests with `pytest`.
+Run the tests with `pytest` and the linter with `ruff check .` (install it with `pip install ruff`).
+Both run automatically on every push and pull request via GitHub Actions.
 
 ## Limitations and next steps
 

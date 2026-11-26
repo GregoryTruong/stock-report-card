@@ -3,10 +3,10 @@
 import pandas as pd
 import streamlit as st
 
+from src import ui
 from src.data import MARKET_TICKER, get_company_info, get_price_history, search_tickers
 from src.grading import CATEGORIES, build_report_card
 from src.metrics import annualized_volatility, collect_metrics, drawdown_series, growth_of_10k
-from src import ui
 
 st.set_page_config(page_title="Stock Report Card", layout="wide")
 st.html(ui.CSS)
