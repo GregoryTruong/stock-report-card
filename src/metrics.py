@@ -62,6 +62,15 @@ def growth_of_10k(prices: pd.Series) -> pd.Series:
     return prices / prices.iloc[0] * 10_000
 
 
+def _number(value):
+    """Yahoo sometimes sends numbers as text (like "Infinity") or as NaN. Return a float, or None."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if math.isnan(value) or math.isinf(value) else value
+
+
 def _clean_pe(value):
     """A P/E ratio only makes sense when the company has profits.
 
@@ -69,7 +78,7 @@ def _clean_pe(value):
     treat as the worst possible valuation (infinity).
     """
     try:
-        value = float(value)  # Yahoo sometimes sends numbers as text, like "Infinity"
+        value = float(value)  # "Infinity" as text becomes math.inf
     except (TypeError, ValueError):
         return None
     if math.isnan(value):
@@ -80,19 +89,19 @@ def _clean_pe(value):
 def collect_metrics(info: dict, prices: pd.Series, market_prices: pd.Series) -> dict:
     """Gather every number used by the report card into one dictionary."""
     trailing_pe = _clean_pe(info.get("trailingPE"))
-    if trailing_pe is None and (info.get("trailingEps") or 0) < 0:
+    if trailing_pe is None and (_number(info.get("trailingEps")) or 0) < 0:
         trailing_pe = math.inf  # Yahoo leaves P/E blank when earnings are negative
 
     return {
         # Growth and profitability come straight from Yahoo's company data.
-        "revenue_growth": info.get("revenueGrowth"),
-        "earnings_growth": info.get("earningsGrowth"),
-        "profit_margin": info.get("profitMargins"),
-        "return_on_equity": info.get("returnOnEquity"),
+        "revenue_growth": _number(info.get("revenueGrowth")),
+        "earnings_growth": _number(info.get("earningsGrowth")),
+        "profit_margin": _number(info.get("profitMargins")),
+        "return_on_equity": _number(info.get("returnOnEquity")),
         # Valuation
         "trailing_pe": trailing_pe,
         "forward_pe": _clean_pe(info.get("forwardPE")),
-        "price_to_sales": info.get("priceToSalesTrailing12Months"),
+        "price_to_sales": _number(info.get("priceToSalesTrailing12Months")),
         # Risk is calculated by us from the price history.
         "volatility": annualized_volatility(prices),
         "max_drawdown": max_drawdown(prices),

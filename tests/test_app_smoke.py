@@ -6,6 +6,7 @@ and the Methodology page. Yahoo Finance is replaced with fake data, so they run
 offline and give the same result every time.
 """
 
+import re
 from pathlib import Path
 
 import numpy as np
@@ -69,8 +70,13 @@ def run_app(**query) -> AppTest:
     return at.run()
 
 
+def unescape(text):
+    """Undo the app's Markdown escaping, so tests can check the words a visitor sees."""
+    return re.sub(r"\\(.)", r"\1", text)
+
+
 def errors(at):
-    return [e.value for e in at.error]
+    return [unescape(e.value) for e in at.error]
 
 
 @pytest.mark.parametrize("ticker", ["AAPL", "LOSS", "SPYX", "ATZ.TO", "BLANK"])
@@ -129,7 +135,13 @@ def test_markdown_in_the_url_is_shown_as_plain_text():
     at = run_app(q="[Log in again](https://evil.example)")
     assert not at.exception
     warning = at.warning[0].value
-    assert "\\[Log in again\\]\\(https://evil.example\\)" in warning  # escaped, so no live link
+    assert "\\[Log in again\\]\\(https\\:\\/\\/evil\\.example\\)" in warning  # escaped, so no live link
+    assert '"[Log in again](https://evil.example)"' in unescape(warning)  # and the visitor sees exactly what they typed
+
+
+def test_bare_web_address_is_escaped():
+    at = run_app(q="log in at www.evil.example")
+    assert "www\\.evil\\.example" in at.warning[0].value
 
 
 def test_theme_in_the_url_wins():

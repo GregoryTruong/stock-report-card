@@ -68,6 +68,12 @@ def test_fund_with_only_risk_data_cannot_outrank_a_company():
     assert company["overall_score"] is not None
 
 
+def test_fund_with_a_pe_ratio_still_gets_no_overall_grade():
+    # Real ETFs like SPY have a P/E on Yahoo, which gives them Risk + Valuation.
+    fund = build_report_card({"volatility": 0.15, "max_drawdown": -0.15, "beta": 0.8, "trailing_pe": 13.0})
+    assert fund["overall_score"] is None
+
+
 def test_validate_prices_rejects_stock_that_stopped_trading():
     # Like EA, whose last trade on Yahoo Finance was months ago.
     prices = make_prices([100.0] * 100, start="2026-01-01")

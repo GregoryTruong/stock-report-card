@@ -1,5 +1,7 @@
 """Downloads stock data from Yahoo Finance using the yfinance library."""
 
+import re
+
 import pandas as pd
 import yfinance as yf
 
@@ -77,12 +79,21 @@ def search_tickers(query: str, limit: int = 8) -> list[dict]:
     ]
 
 
-def _looks_like_ticker(query: str) -> bool:
-    """AAPL, aapl, ATZ.TO and BRK-B look like tickers; "aritzia" and "tesla" look like names."""
+def _looks_like_ticker(query: str, matches: list[dict] = ()) -> bool:
+    """AAPL, ea, ATZ.TO and BRK-B look like tickers; "aritzia", "tesla" and "ford" look like names.
+
+    A short lowercase word like "ea" counts as a ticker, unless a search result's
+    company name starts with it ("ford" -> Ford Motor Company, "nike" -> Nike, Inc.).
+    """
     text = query.strip()
     if not text or " " in text or len(text) > 10:
         return False
-    return text.isupper() or len(text) <= 4 or any(c in text for c in ".-^=") or any(c.isdigit() for c in text)
+    if text.isupper() or any(c in text for c in ".-^=") or any(c.isdigit() for c in text):
+        return True
+    if len(text) > 4:
+        return False
+    word = text.lower()
+    return not any(re.match(rf"{re.escape(word)}\b", m.get("name", ""), re.IGNORECASE) for m in matches)
 
 
 def rank_matches(query: str, matches: list[dict]) -> list[dict]:
@@ -93,7 +104,8 @@ def rank_matches(query: str, matches: list[dict]) -> list[dict]:
     ticker; for a company name like "aritzia" the real search results go first.
     """
     symbol = query.strip().upper()
+    ticker_like = _looks_like_ticker(query, matches)
     if symbol and " " not in symbol and len(symbol) <= 10 and symbol not in {m["symbol"].upper() for m in matches}:
         raw = {"symbol": symbol, "name": "", "exchange": ""}
-        matches = [raw, *matches] if _looks_like_ticker(query) or not matches else [*matches, raw]
-    return sorted(matches, key=lambda m: m["symbol"].upper() != symbol or not _looks_like_ticker(query))
+        matches = [raw, *matches] if ticker_like or not matches else [*matches, raw]
+    return sorted(matches, key=lambda m: m["symbol"].upper() != symbol or not ticker_like)

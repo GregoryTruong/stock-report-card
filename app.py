@@ -26,25 +26,36 @@ def current_theme() -> str:
 
 
 def plain(text) -> str:
-    """Escape Markdown so text from the URL or Yahoo shows as-is (no sneaky links or formatting)."""
-    return re.sub(r"([\\`*_{}\[\]()<>#+!|~$-])", r"\\\1", str(text))
+    """Escape Markdown so text from the URL or Yahoo shows as-is (no sneaky links or formatting).
+
+    Every ASCII punctuation mark gets a backslash, which also breaks up bare web
+    addresses like www.example.com so they don't turn into live links.
+    """
+    return re.sub(r"([!-/:-@\[-`{-~])", r"\\\1", str(text))
 
 
 def switch_theme(mode: str):
-    """Flip Streamlit's theme by saving the choice where Streamlit looks for it, then reloading.
+    """Make Streamlit's theme match `mode` by saving it where Streamlit looks, then reloading.
 
     Streamlit has no Python call to change the theme, but it remembers each
     visitor's pick in the browser's localStorage. The page, ticker and time
     period are kept in the URL, so the reload lands right back where you were.
+    It only reloads when the saved theme is different, so it never loops, and it
+    also runs when a shared link carries ?theme=, so the colors always match.
     """
     choice = json.dumps("Dark" if mode == "dark" else "Light")
     components.html(f"""<script>
       const w = window.parent;
-      w.localStorage.setItem(`stActiveTheme-${{w.location.pathname}}-v2`, JSON.stringify({choice}));
+      const key = `stActiveTheme-${{w.location.pathname}}-v2`;
       const url = new URL(w.location.href);
       url.searchParams.set("theme", {json.dumps(mode)});
-      w.history.replaceState(null, "", url.toString());  // a plain reload is allowed, navigating isn't
-      w.location.reload();
+      w.history.replaceState(null, "", url.toString());
+      try {{
+        if (w.localStorage.getItem(key) !== JSON.stringify({choice})) {{
+          w.localStorage.setItem(key, JSON.stringify({choice}));
+          w.location.reload();  // a plain reload is allowed from here, navigating isn't
+        }}
+      }} catch (e) {{}}  // storage blocked (private window): keep the page as it is
     </script>""", height=0)
 
 
@@ -127,6 +138,8 @@ with st.sidebar:
     dark_mode = st.toggle(":material/dark_mode: Dark mode", value=THEME == "dark")
     if dark_mode != (THEME == "dark"):
         switch_theme("dark" if dark_mode else "light")
+    elif st.query_params.get("theme") in ("dark", "light"):
+        switch_theme(THEME)  # a shared link with ?theme= : bring Streamlit's own theme in line
     st.caption("For learning purposes only. Not financial advice.")
 
 st.query_params.update(page=page, period=period_label or "5Y", q=st.session_state.query)
