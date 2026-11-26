@@ -30,3 +30,14 @@ def test_company_names_are_not_treated_as_tickers():
 
 def test_blank_query_adds_nothing():
     assert rank_matches("   ", []) == []
+
+
+def test_company_name_search_puts_real_results_first():
+    # "Aritzia" is the search box's own example; it used to open a fake ARITZIA ticker.
+    ranked = rank_matches("Aritzia", [result("ATZ.TO", "Aritzia Inc.")])
+    assert [m["symbol"] for m in ranked] == ["ATZ.TO", "ARITZIA"]
+    assert rank_matches("tesla", [result("TSLA", "Tesla, Inc.")])[0]["symbol"] == "TSLA"
+
+
+def test_lowercase_short_ticker_still_goes_first():
+    assert rank_matches("ea", [result("EAT"), result("EARN")])[0]["symbol"] == "EA"

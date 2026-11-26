@@ -28,6 +28,9 @@ CATEGORIES = {
     ],
 }
 
+# The overall grade needs data in at least this many of the four categories.
+MIN_CATEGORIES_FOR_OVERALL = 2
+
 # One plain-English sentence per category for a high, middle, or low score.
 SUMMARIES = {
     "Growth": (
@@ -127,7 +130,10 @@ def build_report_card(metrics: dict) -> dict:
             "details": details,
         }
 
-    overall_score = _average(c["score"] for c in categories.values())
+    # A fair overall grade needs at least two categories with data. Funds usually only
+    # have Risk data, and averaging one category would let them outrank real companies.
+    scored = [c["score"] for c in categories.values() if c["score"] is not None]
+    overall_score = _average(scored) if len(scored) >= MIN_CATEGORIES_FOR_OVERALL else None
     return {
         "categories": categories,
         "overall_score": overall_score,

@@ -81,3 +81,10 @@ def test_format_large_number(value, currency, expected):
 def test_format_price_shows_non_usd_currency():
     assert format_price(1234.5) == "$1,234.50"
     assert format_price(45.1, "CAD") == "45.10 CAD"
+
+
+@pytest.mark.parametrize(("raw", "expected"), [("Infinity", math.inf), ("21.5", 21.5), ("abc", None),
+                                                (float("nan"), None), (None, None), (-3, math.inf)])
+def test_pe_values_from_yahoo_are_cleaned(raw, expected):
+    metrics = collect_metrics({"forwardPE": raw}, wobbly_prices(1), wobbly_prices(2))
+    assert metrics["forward_pe"] == expected

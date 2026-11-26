@@ -68,7 +68,11 @@ def _clean_pe(value):
     Negative or missing earnings means the company is losing money, which we
     treat as the worst possible valuation (infinity).
     """
-    if value is None:
+    try:
+        value = float(value)  # Yahoo sometimes sends numbers as text, like "Infinity"
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(value):
         return None
     return math.inf if value <= 0 else value
 

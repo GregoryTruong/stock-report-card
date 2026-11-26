@@ -279,7 +279,7 @@ def hero_html() -> str:
 
 def format_price(value, currency="USD") -> str:
     """$12.34 for US dollars, otherwise 12.34 CAD (or whatever the currency is)."""
-    return f"${value:,.2f}" if currency == "USD" else f"{value:,.2f} {currency}"
+    return f"${value:,.2f}" if currency == "USD" else f"{value:,.2f} {html.escape(str(currency))}"
 
 
 def header_html(name, ticker, subtitle, price, change, currency="USD") -> str:

@@ -51,7 +51,21 @@ def test_report_card_handles_missing_data():
     card = build_report_card({"volatility": 0.15, "max_drawdown": -0.15, "beta": 0.8})
     assert card["categories"]["Risk"]["grade"] == "A"
     assert card["categories"]["Growth"]["grade"] == "N/A"
-    assert card["overall_grade"] == "A"  # only categories with data count
+    assert card["overall_grade"] == "N/A"  # one category isn't enough for a fair overall grade
+
+
+def test_overall_grade_uses_categories_that_have_data():
+    card = build_report_card({"volatility": 0.15, "max_drawdown": -0.15, "beta": 0.8,
+                              "profit_margin": 0.25, "return_on_equity": 0.30})
+    assert card["overall_grade"] == "A"  # Risk + Profitability, Growth and Valuation skipped
+
+
+def test_fund_with_only_risk_data_cannot_outrank_a_company():
+    fund = build_report_card({"volatility": 0.15, "max_drawdown": -0.15, "beta": 0.8})
+    company = build_report_card({"volatility": 0.4, "max_drawdown": -0.4, "beta": 1.3,
+                                 "revenue_growth": 0.05, "profit_margin": 0.1})
+    assert fund["overall_score"] is None
+    assert company["overall_score"] is not None
 
 
 def test_validate_prices_rejects_stock_that_stopped_trading():
@@ -70,3 +84,27 @@ def test_validate_prices_rejects_too_little_history():
 def test_validate_prices_accepts_normal_stock():
     prices = make_prices([100.0] * 100, start="2026-07-06")
     validate_prices(prices, "OK", today=pd.Timestamp("2026-10-14"))
+
+
+def test_get_price_history_drops_missing_and_broken_prices(monkeypatch):
+    import numpy as np
+
+    import src.data as data
+
+    closes = np.linspace(100, 120, 100)
+    closes[[10, 50]] = np.nan
+    closes[20] = 0
+    history = pd.DataFrame({"Close": closes},
+                           index=pd.bdate_range(end=pd.Timestamp.now().normalize(), periods=100, tz="UTC"))
+
+    class FakeTicker:
+        def __init__(self, ticker):
+            pass
+
+        def history(self, **kwargs):
+            return history
+
+    monkeypatch.setattr(data.yf, "Ticker", FakeTicker)
+    prices = data.get_price_history("TEST")
+    assert len(prices) == 97
+    assert prices.notna().all() and (prices > 0).all()

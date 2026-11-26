@@ -123,3 +123,22 @@ def test_methodology_page():
     at = run_app(page="Methodology")
     assert not at.exception
     assert any("How the grading works" in h.value for h in at.header)
+
+
+def test_markdown_in_the_url_is_shown_as_plain_text():
+    at = run_app(q="[Log in again](https://evil.example)")
+    assert not at.exception
+    warning = at.warning[0].value
+    assert "\\[Log in again\\]\\(https://evil.example\\)" in warning  # escaped, so no live link
+
+
+def test_theme_in_the_url_wins():
+    at = run_app(q="AAPL", theme="light")
+    assert not at.exception
+    assert at.toggle[0].value is False  # the Dark mode switch is off in light mode
+
+
+def test_compare_page_ranks_a_fund_below_real_companies():
+    at = run_app(page="Compare")
+    at.text_input(key="compare_input").set_value("SPYX, AAPL").run()
+    assert list(at.dataframe[0].value["Ticker"]) == ["AAPL", "SPYX"]

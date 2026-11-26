@@ -1,6 +1,7 @@
 """Stock Report Card: the web app. Run it with:  streamlit run app.py"""
 
 import json
+import re
 
 import pandas as pd
 import streamlit as st
@@ -15,9 +16,18 @@ st.set_page_config(page_title="Stock Report Card", page_icon=":material/monitori
 
 
 def current_theme() -> str:
-    """"dark" or "light": whichever theme Streamlit is showing this visitor."""
+    """"dark" or "light". A ?theme= in the URL wins, because Streamlit's own reading of
+    the theme can be wrong on the first load right after the switch reloads the page."""
+    from_url = st.query_params.get("theme")
+    if from_url in ("dark", "light"):
+        return from_url
     theme_type = getattr(getattr(st.context, "theme", None), "type", None)
     return theme_type if theme_type in ("dark", "light") else "dark"
+
+
+def plain(text) -> str:
+    """Escape Markdown so text from the URL or Yahoo shows as-is (no sneaky links or formatting)."""
+    return re.sub(r"([\\`*_{}\[\]()<>#+!|~$-])", r"\\\1", str(text))
 
 
 def switch_theme(mode: str):
@@ -31,6 +41,9 @@ def switch_theme(mode: str):
     components.html(f"""<script>
       const w = window.parent;
       w.localStorage.setItem(`stActiveTheme-${{w.location.pathname}}-v2`, JSON.stringify({choice}));
+      const url = new URL(w.location.href);
+      url.searchParams.set("theme", {json.dumps(mode)});
+      w.history.replaceState(null, "", url.toString());  // a plain reload is allowed, navigating isn't
       w.location.reload();
     </script>""", height=0)
 
@@ -136,7 +149,7 @@ def report_card_page():
         return
     matches = find_stocks(query)
     if not matches:
-        st.warning(f'No stocks found for "{query}". Try the full company name or a ticker.')
+        st.warning(f'No stocks found for "{plain(query)}". Try the full company name or a ticker.')
         return
     if len(matches) > 1:
         pick = st.selectbox(
@@ -152,7 +165,7 @@ def report_card_page():
         with st.spinner(f"Loading {ticker}..."):
             info, prices, market_prices, metrics, card = load_stock(ticker, period)
     except Exception as error:
-        st.error(f"Couldn't load {ticker}: {error}")
+        st.error(f"Couldn't load {plain(ticker)}: {plain(error)}")
         return
 
     day_change = prices.iloc[-1] / prices.iloc[-2] - 1
@@ -181,7 +194,7 @@ def report_card_page():
             for detail in category["details"]
         ]
         st.dataframe(
-            pd.DataFrame(rows), hide_index=True, use_container_width=True,
+            pd.DataFrame(rows), hide_index=True, width="stretch",
             column_config={"Score": st.column_config.ProgressColumn(
                 min_value=0, max_value=100, format="%.0f")},
         )
@@ -192,12 +205,12 @@ def report_card_page():
     with growth_tab:
         st.plotly_chart(
             ui.growth_chart(growth_of_10k(prices), growth_of_10k(market_prices), ticker),
-            use_container_width=True,
+            width="stretch",
         )
     with drawdown_tab:
         st.caption("How far below its highest price the stock was on each day. "
                    "0% means it was at a high.")
-        st.plotly_chart(ui.drawdown_chart(drawdown_series(prices)), use_container_width=True)
+        st.plotly_chart(ui.drawdown_chart(drawdown_series(prices)), width="stretch")
 
 
 # ------------------------------------------------------------------ Compare
@@ -218,7 +231,7 @@ def compare_page():
             try:
                 info, _, _, metrics, card = load_stock(t, period)
             except Exception as error:
-                st.warning(f"Skipped {t}: {error}")
+                st.warning(f"Skipped {plain(t)}: {plain(error)}")
                 continue
             row = {"Ticker": t, "Company": info.get("shortName") or t,
                    "Overall": card["overall_grade"], "Score": card["overall_score"] or 0}
@@ -238,7 +251,7 @@ def compare_page():
     score_columns = [f"{name} score" for name in CATEGORIES]
     st.dataframe(
         ranked.drop(columns=score_columns).style.map(ui.grade_cell_style, subset=grade_columns),
-        hide_index=True, use_container_width=True,
+        hide_index=True, width="stretch",
         column_config={
             "Score": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.0f"),
             "Yearly return": st.column_config.NumberColumn(format="percent"),
@@ -250,12 +263,12 @@ def compare_page():
     st.caption("Each dot is a stock. Higher is better return, further right is a bumpier ride. "
                "The gray dot is the S&P 500, so anything above and left of it beat the "
                "market with less risk.")
-    st.plotly_chart(ui.risk_return_chart(table), use_container_width=True)
+    st.plotly_chart(ui.risk_return_chart(table), width="stretch")
 
     st.subheader("Strengths at a glance")
     st.caption("Each shape shows a stock's four category scores. The bigger the shape, the better "
                "the all-round grade. Click names in the legend to hide or show them.")
-    st.plotly_chart(ui.radar_chart(ranked, list(CATEGORIES)), use_container_width=True)
+    st.plotly_chart(ui.radar_chart(ranked, list(CATEGORIES)), width="stretch")
 
 
 # -------------------------------------------------------------- Methodology
@@ -277,7 +290,7 @@ the overall grade is the average of the four categories.
         for label, _, worst, best, kind in rules
     ]
     st.subheader("Cutoffs")
-    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     st.markdown(
         """
 **Growth:** is the company selling more and earning more than last year?

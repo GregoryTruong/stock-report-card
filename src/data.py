@@ -42,7 +42,11 @@ def get_price_history(ticker: str, period: str = "5y") -> pd.Series:
     if history.empty:
         raise ValueError(f"No price data found for '{ticker}'. Try searching by company name.")
 
-    prices = history["Close"]
+    # Drop missing or broken (zero or negative) closes so they can't turn into $nan or infinity.
+    prices = history["Close"].dropna()
+    prices = prices[prices > 0]
+    if prices.empty:
+        raise ValueError(f"No usable price data for '{ticker}'.")
     # Remove timezone info so dates from different tickers line up cleanly.
     prices.index = prices.index.tz_localize(None)
     prices.name = ticker
@@ -73,15 +77,23 @@ def search_tickers(query: str, limit: int = 8) -> list[dict]:
     ]
 
 
-def rank_matches(query: str, matches: list[dict]) -> list[dict]:
-    """Put an exact ticker match first, adding the query itself if it looks like a ticker.
+def _looks_like_ticker(query: str) -> bool:
+    """AAPL, aapl, ATZ.TO and BRK-B look like tickers; "aritzia" and "tesla" look like names."""
+    text = query.strip()
+    if not text or " " in text or len(text) > 10:
+        return False
+    return text.isupper() or len(text) <= 4 or any(c in text for c in ".-^=") or any(c.isdigit() for c in text)
 
-    Yahoo's search hides stocks that stopped trading (like EA), so if the query
-    looks like a ticker we always try it directly. That way the user gets a real
-    explanation instead of a different company with a similar name.
+
+def rank_matches(query: str, matches: list[dict]) -> list[dict]:
+    """Put an exact ticker match first, and always offer the query itself as a ticker.
+
+    Yahoo's search hides stocks that stopped trading (like EA), so we always let
+    the user try the query directly. It goes first only when it looks like a
+    ticker; for a company name like "aritzia" the real search results go first.
     """
     symbol = query.strip().upper()
-    looks_like_ticker = bool(symbol) and " " not in symbol and len(symbol) <= 10
-    if looks_like_ticker and symbol not in {m["symbol"].upper() for m in matches}:
-        matches = [{"symbol": symbol, "name": "", "exchange": ""}, *matches]
-    return sorted(matches, key=lambda m: m["symbol"].upper() != symbol)
+    if symbol and " " not in symbol and len(symbol) <= 10 and symbol not in {m["symbol"].upper() for m in matches}:
+        raw = {"symbol": symbol, "name": "", "exchange": ""}
+        matches = [raw, *matches] if _looks_like_ticker(query) or not matches else [*matches, raw]
+    return sorted(matches, key=lambda m: m["symbol"].upper() != symbol or not _looks_like_ticker(query))

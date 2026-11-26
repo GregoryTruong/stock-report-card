@@ -16,7 +16,8 @@ def test_grade_chip_uses_grade_color():
 
 
 def test_scorecard_shows_verdict_and_every_category():
-    card = build_report_card({"volatility": 0.15, "max_drawdown": -0.15, "beta": 0.8})
+    card = build_report_card({"volatility": 0.15, "max_drawdown": -0.15, "beta": 0.8,
+                              "profit_margin": 0.3, "return_on_equity": 0.4})
     page = scorecard_html(card)
     assert "Top of the class" in page
     for name in ("Growth", "Profitability", "Valuation", "Risk"):
