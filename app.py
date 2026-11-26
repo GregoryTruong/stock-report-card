@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from src import ui
-from src.data import MARKET_TICKER, get_company_info, get_price_history, search_tickers
+from src.data import MARKET_TICKER, get_company_info, get_price_history, rank_matches, search_tickers
 from src.grading import CATEGORIES, build_report_card
 from src.metrics import annualized_volatility, collect_metrics, drawdown_series, growth_of_10k
 
@@ -33,19 +33,20 @@ def load_stock(ticker: str, period: str):
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def find_stocks(query: str):
-    """Search by company name or ticker. Exact ticker matches go first.
+def search_cached(query: str):
+    return search_tickers(query)
 
-    Yahoo's search hides stocks that stopped trading (like EA), so if the query
-    looks like a ticker we always try it directly. That way the user gets a real
-    explanation instead of a different company with a similar name.
+
+def find_stocks(query: str):
+    """Search by company name or ticker, with an exact ticker match first.
+
+    If Yahoo's search is down or errors, we still try the query as a ticker.
     """
-    matches = search_tickers(query)
-    symbol = query.upper()
-    looks_like_ticker = " " not in symbol and len(symbol) <= 10
-    if looks_like_ticker and symbol not in {m["symbol"].upper() for m in matches}:
-        matches.insert(0, {"symbol": symbol, "name": "", "exchange": ""})
-    return sorted(matches, key=lambda m: m["symbol"].upper() != symbol)
+    try:
+        matches = search_cached(query)
+    except Exception:
+        matches = []
+    return rank_matches(query, matches)
 
 
 def use_preset_ticker():
@@ -89,10 +90,7 @@ def report_card_page():
     query = st.session_state.query.strip()
     if not query:
         return
-    try:
-        matches = find_stocks(query)
-    except Exception:
-        matches = []
+    matches = find_stocks(query)
     if not matches:
         st.warning(f'No stocks found for "{query}". Try the full company name or a ticker.')
         return

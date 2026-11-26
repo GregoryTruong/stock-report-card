@@ -71,3 +71,17 @@ def search_tickers(query: str, limit: int = 8) -> list[dict]:
         for q in quotes
         if q.get("quoteType") in ("EQUITY", "ETF") and q.get("symbol")
     ]
+
+
+def rank_matches(query: str, matches: list[dict]) -> list[dict]:
+    """Put an exact ticker match first, adding the query itself if it looks like a ticker.
+
+    Yahoo's search hides stocks that stopped trading (like EA), so if the query
+    looks like a ticker we always try it directly. That way the user gets a real
+    explanation instead of a different company with a similar name.
+    """
+    symbol = query.strip().upper()
+    looks_like_ticker = bool(symbol) and " " not in symbol and len(symbol) <= 10
+    if looks_like_ticker and symbol not in {m["symbol"].upper() for m in matches}:
+        matches = [{"symbol": symbol, "name": "", "exchange": ""}, *matches]
+    return sorted(matches, key=lambda m: m["symbol"].upper() != symbol)
