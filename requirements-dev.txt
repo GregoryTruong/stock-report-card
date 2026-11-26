@@ -1,4 +1,4 @@
 # Everything in requirements.txt, plus the tools for testing and linting.
 -r requirements.txt
 pytest>=9.2,<10
-ruff
+ruff==0.17.6
