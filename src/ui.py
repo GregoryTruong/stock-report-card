@@ -1,59 +1,233 @@
-"""Visual building blocks: grade colors, the scorecard table and chart styling."""
+"""Visual building blocks: the dark theme, report card widgets and chart styling."""
 
 import html
+import threading
 
 import pandas as pd
 import plotly.graph_objects as go
 
-# Colors carry meaning: green = good grade, red = bad grade, teal = the stock,
-# gray = the market. (text color, background color) for each grade.
-GRADE_COLORS = {
-    "A": ("#166534", "#DCFCE7"),
-    "B": ("#3F6212", "#ECFCCB"),
-    "C": ("#92400E", "#FEF3C7"),
-    "D": ("#9A3412", "#FFEDD5"),
-    "F": ("#991B1B", "#FEE2E2"),
-    "N/A": ("#4B5563", "#F3F4F6"),
+# Two color palettes, one per theme. Colors carry meaning in both: green = good
+# grade, red = bad grade, blue = the stock, gray = the market. Each grade has a
+# strong color for text and rings, and a see-through version for chip backgrounds.
+THEMES = {
+    "dark": {
+        "GRADE_COLORS": {"A": "#34D399", "B": "#A3E635", "C": "#FBBF24", "D": "#FB923C",
+                         "F": "#F87171", "N/A": "#94A3B8"},
+        "STOCK_COLOR": "#60A5FA", "MARKET_COLOR": "#64748B",
+        "GAIN_COLOR": "#34D399", "LOSS_COLOR": "#F87171",
+        "TEXT": "#E6EAF2", "MUTED": "#8B95A7",
+        "BG": "#0B0F17", "PANEL": "#131A26", "SIDEBAR": "rgba(11, 15, 23, .85)",
+        "CARD": "rgba(19, 26, 38, 0.72)", "BORDER": "rgba(148, 163, 184, 0.14)",
+        "TRACK": "rgba(255, 255, 255, .07)", "GRID": "rgba(148, 163, 184, 0.10)",
+        "GLOW": 0.18,
+    },
+    "light": {
+        "GRADE_COLORS": {"A": "#059669", "B": "#65A30D", "C": "#D97706", "D": "#EA580C",
+                         "F": "#DC2626", "N/A": "#64748B"},
+        "STOCK_COLOR": "#2563EB", "MARKET_COLOR": "#94A3B8",
+        "GAIN_COLOR": "#059669", "LOSS_COLOR": "#DC2626",
+        "TEXT": "#0F172A", "MUTED": "#5B6474",
+        "BG": "#F5F7FB", "PANEL": "#FFFFFF", "SIDEBAR": "rgba(255, 255, 255, .8)",
+        "CARD": "rgba(255, 255, 255, 0.85)", "BORDER": "rgba(15, 23, 42, 0.10)",
+        "TRACK": "rgba(15, 23, 42, .08)", "GRID": "rgba(15, 23, 42, 0.07)",
+        "GLOW": 0.12,
+    },
 }
-STOCK_COLOR = "#0F766E"
-MARKET_COLOR = "#9CA3AF"
-GAIN_COLOR = "#15803D"
-LOSS_COLOR = "#B91C1C"
-MUTED = "#5B6170"
-MONO = "'IBM Plex Mono', monospace"
+# One short verdict per overall grade, shown under the big grade ring.
+VERDICTS = {
+    "A": "Top of the class",
+    "B": "Strong all-rounder",
+    "C": "Middle of the pack",
+    "D": "Needs work",
+    "F": "Struggling",
+    "N/A": "Not enough data",
+}
+CATEGORY_ICONS = {"Growth": "🚀", "Profitability": "💰", "Valuation": "🏷️", "Risk": "🛡️"}
 
-CSS = f"""
+
+class _Palette(threading.local):
+    """The active theme's colors, e.g. T.TEXT.
+
+    Streamlit runs each visitor's session in its own thread, so keeping the
+    palette per thread means one visitor's light mode never leaks into
+    another visitor's dark mode.
+    """
+
+    def __init__(self):
+        self.__dict__.update(THEMES["dark"])
+
+
+T = _Palette()
+
+
+def set_theme(mode: str) -> None:
+    """Switch to the "dark" or "light" palette. The app calls this before drawing anything."""
+    T.__dict__.update(THEMES.get(mode, THEMES["dark"]))
+
+
+MONO = "'JetBrains Mono', 'IBM Plex Mono', monospace"
+DISPLAY = "'Space Grotesk', 'IBM Plex Sans', sans-serif"
+
+
+def _rgba(hex_color: str, alpha: float) -> str:
+    """'#34D399', 0.15 -> 'rgba(52, 211, 153, 0.15)'."""
+    r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+    return f"rgba({r}, {g}, {b}, {alpha})"
+
+
+def grade_color(grade: str) -> str:
+    return T.GRADE_COLORS.get(grade, T.GRADE_COLORS["N/A"])
+
+
+FONTS_URL = ("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700"
+             "&family=JetBrains+Mono:wght@400;600&display=swap")
+
+def css() -> str:
+    """The page stylesheet, built from the current theme's colors."""
+    return f"""
 <style>
-.rc-header {{ display: flex; justify-content: space-between; align-items: flex-end;
-  flex-wrap: wrap; gap: 16px; padding-bottom: 16px; margin-bottom: 8px;
-  border-bottom: 1px solid #DFE2E6; }}
-.rc-name {{ font-size: 1.75rem; font-weight: 600; line-height: 1.2; }}
-.rc-sub {{ color: {MUTED}; font-size: 0.9rem; margin-top: 4px; }}
-.rc-price {{ font-family: {MONO}; font-size: 1.75rem; font-weight: 500; text-align: right; }}
-.rc-change {{ font-family: {MONO}; font-size: 0.9rem; text-align: right; }}
-.rc-chip {{ display: inline-flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; border-radius: 6px; font-family: {MONO}; font-weight: 500; }}
-.rc-chip.lg {{ width: 64px; height: 64px; font-size: 2rem; border-radius: 8px; }}
-.rc-overall {{ display: flex; align-items: center; gap: 16px; margin: 8px 0 16px; }}
-.rc-overall .label {{ color: {MUTED}; font-size: 0.85rem; }}
-.rc-overall .score {{ font-family: {MONO}; font-size: 1.1rem; }}
-table.rc-card {{ width: 100%; border-collapse: collapse; font-size: 0.95rem; }}
-table.rc-card th {{ text-align: left; color: {MUTED}; font-weight: 500; font-size: 0.8rem;
-  padding: 8px 12px; border-bottom: 1px solid #DFE2E6; }}
-table.rc-card td {{ padding: 12px; border-bottom: 1px solid #EEF0F2; vertical-align: middle; }}
-.rc-bar {{ display: inline-block; width: 120px; height: 6px; background: #EEF0F2;
-  border-radius: 3px; overflow: hidden; vertical-align: middle; }}
-.rc-bar span {{ display: block; height: 100%; }}
-.rc-num {{ font-family: {MONO}; font-size: 0.85rem; color: {MUTED}; margin-left: 8px; }}
-.rc-nowrap {{ white-space: nowrap; }}
+@import url("{FONTS_URL}");
+/* Soft blue glow behind the whole app, like city lights at night. */
+.stApp {{
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(59, 130, 246, {T.GLOW}), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(14, 165, 233, {T.GLOW / 2}), transparent 60%),
+    {T.BG};
+}}
+[data-testid="stHeader"] {{ background: transparent; }}
+h1, h2, h3 {{ font-family: {DISPLAY} !important; letter-spacing: -0.02em; }}
+
+@keyframes rc-rise {{ from {{ opacity: 0; transform: translateY(14px); }} to {{ opacity: 1; transform: none; }} }}
+@keyframes rc-grow {{ from {{ width: 0; }} }}
+@keyframes rc-ring {{ from {{ opacity: 0; transform: rotate(-120deg) scale(.85); }} }}
+@keyframes rc-pulse {{ 0%, 100% {{ opacity: .55; }} 50% {{ opacity: 1; }} }}
+
+.rc-rise {{ animation: rc-rise .6s cubic-bezier(.2, .7, .2, 1) both; }}
+
+/* Hero */
+.rc-hero {{ padding: 8px 0 20px; }}
+.rc-eyebrow {{ display: inline-flex; align-items: center; gap: 8px; font-family: {MONO};
+  font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: {T.STOCK_COLOR};
+  padding: 5px 12px; border: 1px solid {_rgba(T.STOCK_COLOR, .35)}; border-radius: 999px;
+  background: {_rgba(T.STOCK_COLOR, .08)}; }}
+.rc-eyebrow .dot {{ width: 6px; height: 6px; border-radius: 50%; background: {T.STOCK_COLOR};
+  box-shadow: 0 0 10px {T.STOCK_COLOR}; animation: rc-pulse 2s infinite; }}
+.rc-hero h1 {{ font-size: clamp(2rem, 4.5vw, 3.2rem); line-height: 1.05; margin: 14px 0 8px;
+  padding: 0; font-weight: 700; color: {T.TEXT}; }}
+.rc-hero h1 span {{ background: linear-gradient(90deg, #60A5FA, #22D3EE 60%, #A5F3FC);
+  -webkit-background-clip: text; background-clip: text; color: transparent; }}
+.rc-hero p {{ color: {T.MUTED}; font-size: 1.02rem; max-width: 620px; margin: 0; }}
+
+/* Cards */
+.rc-card {{ background: {T.CARD}; border: 1px solid {T.BORDER}; border-radius: 16px;
+  padding: 20px; backdrop-filter: blur(8px); }}
+
+/* Company header */
+.rc-header {{ display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+  gap: 16px; margin: 8px 0 16px; }}
+.rc-name {{ font-family: {DISPLAY}; font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700;
+  line-height: 1.1; color: {T.TEXT}; }}
+.rc-tags {{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }}
+.rc-tag {{ font-size: .78rem; color: {T.MUTED}; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid {T.BORDER}; background: {T.TRACK}; }}
+.rc-tag.ticker {{ font-family: {MONO}; color: {T.STOCK_COLOR}; border-color: {_rgba(T.STOCK_COLOR, .4)}; }}
+.rc-price {{ font-family: {MONO}; font-size: clamp(1.6rem, 3vw, 2.1rem); font-weight: 600;
+  text-align: right; color: {T.TEXT}; }}
+.rc-change {{ display: inline-block; font-family: {MONO}; font-size: .85rem; font-weight: 600;
+  padding: 3px 10px; border-radius: 999px; float: right; margin-top: 4px; }}
+
+/* Stat tiles */
+.rc-stats {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 8px; }}
+.rc-stat {{ padding: 16px 18px; }}
+.rc-stat .k {{ font-size: .75rem; color: {T.MUTED}; text-transform: uppercase; letter-spacing: .08em; }}
+.rc-stat .v {{ font-family: {MONO}; font-size: 1.45rem; font-weight: 600; color: {T.TEXT}; margin-top: 6px; }}
+.rc-stat .d {{ font-family: {MONO}; font-size: .78rem; margin-top: 4px; }}
+
+/* Report card: ring + category cards */
+.rc-report {{ display: grid; grid-template-columns: 260px 1fr; gap: 16px; margin: 4px 0 8px; }}
+.rc-overall {{ display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 6px; }}
+.rc-ring {{ position: relative; width: 150px; height: 150px; }}
+.rc-ring .arc {{ position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(var(--c) calc(var(--p) * 1%), {T.TRACK} 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 11px), #000 calc(100% - 10px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 11px), #000 calc(100% - 10px));
+  filter: drop-shadow(0 0 6px var(--c)); animation: rc-ring 1.2s cubic-bezier(.2, .7, .2, 1) both; }}
+.rc-ring .letter {{ position: absolute; inset: 0; display: grid; place-items: center;
+  font-family: {DISPLAY}; font-size: 3.6rem; font-weight: 700; }}
+.rc-overall .verdict {{ font-family: {DISPLAY}; font-size: 1.15rem; font-weight: 600; color: {T.TEXT}; }}
+.rc-overall .score {{ font-family: {MONO}; font-size: .85rem; color: {T.MUTED}; }}
+.rc-cats {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }}
+.rc-cat {{ position: relative; overflow: hidden; transition: transform .2s, border-color .2s; }}
+.rc-cat:hover {{ transform: translateY(-2px); border-color: {T.MUTED}; }}
+.rc-cat::before {{ content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--c); }}
+.rc-cat .top {{ display: flex; justify-content: space-between; align-items: center; }}
+.rc-cat .name {{ font-family: {DISPLAY}; font-size: 1.05rem; font-weight: 600; color: {T.TEXT}; }}
+.rc-cat .icon {{ margin-right: 8px; }}
+.rc-cat .bar {{ height: 6px; border-radius: 3px; background: {T.TRACK};
+  margin: 14px 0 10px; overflow: hidden; }}
+.rc-cat .bar span {{ display: block; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, {T.TRACK}, var(--c));
+  box-shadow: 0 0 12px var(--c); animation: rc-grow 1s cubic-bezier(.2, .7, .2, 1) both; }}
+.rc-cat .meta {{ display: flex; justify-content: space-between; font-size: .88rem; color: {T.MUTED}; gap: 12px; }}
+.rc-cat .meta b {{ font-family: {MONO}; color: {T.TEXT}; font-weight: 600; white-space: nowrap; }}
+
+.rc-chip {{ display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px;
+  border-radius: 10px; font-family: {DISPLAY}; font-weight: 700; font-size: 1.1rem; }}
+
+/* Compare podium */
+.rc-podium {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;
+  align-items: end; margin: 8px 0 20px; }}
+.rc-place {{ text-align: center; }}
+.rc-place .medal {{ font-size: 1.8rem; }}
+.rc-place .tk {{ font-family: {MONO}; font-size: 1.3rem; font-weight: 600; color: {T.TEXT}; margin-top: 4px; }}
+.rc-place .co {{ font-size: .82rem; color: {T.MUTED}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+.rc-place .sc {{ font-family: {MONO}; font-size: .85rem; color: {T.MUTED}; margin-top: 8px; }}
+.rc-place.first {{ padding-top: 32px; padding-bottom: 32px; border-color: rgba(251, 191, 36, .45);
+  box-shadow: 0 0 40px rgba(251, 191, 36, .08); }}
+
+/* Plain tables (methodology) */
+table.rc-table {{ width: 100%; border-collapse: collapse; }}
+table.rc-table th {{ text-align: left; color: {T.MUTED}; font-weight: 500; font-size: .8rem;
+  padding: 8px 12px; border-bottom: 1px solid {T.BORDER}; }}
+table.rc-table td {{ padding: 10px 12px; border-bottom: 1px solid {T.TRACK}; color: {T.TEXT}; }}
+
+/* Streamlit widgets, tuned to the theme */
+[data-testid="stSidebar"] {{ background: {T.SIDEBAR}; border-right: 1px solid {T.BORDER}; }}
+[data-testid="stTabs"] button p {{ font-family: {DISPLAY}; font-weight: 600; }}
+[data-testid="stExpander"] details {{ background: {T.CARD}; border-radius: 14px; border-color: {T.BORDER}; }}
+[data-testid="stPlotlyChart"] {{ background: {T.CARD}; border: 1px solid {T.BORDER}; border-radius: 16px;
+  padding: 8px; }}
+
+@media (max-width: 900px) {{
+  .rc-report {{ grid-template-columns: 1fr; }}
+  .rc-stats {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+}}
+@media (max-width: 560px) {{
+  .rc-cats, .rc-podium {{ grid-template-columns: 1fr; }}
+  .rc-price, .rc-change {{ text-align: left; float: none; }}
+}}
+@media (prefers-reduced-motion: reduce) {{
+  *, *::before {{ animation: none !important; transition: none !important; }}
+}}
 </style>
 """
 
 
-def grade_chip(grade: str, large: bool = False) -> str:
-    text, background = GRADE_COLORS.get(grade, GRADE_COLORS["N/A"])
-    size = " lg" if large else ""
-    return f'<span class="rc-chip{size}" style="color:{text};background:{background}">{grade}</span>'
+def grade_chip(grade: str) -> str:
+    color = grade_color(grade)
+    return (f'<span class="rc-chip" style="color:{color};background:{_rgba(color, .14)};'
+            f'border:1px solid {_rgba(color, .35)}">{grade}</span>')
+
+
+def hero_html() -> str:
+    return """
+    <div class="rc-hero rc-rise">
+      <span class="rc-eyebrow"><span class="dot"></span>Stock Report Card</span>
+      <h1>Grade any stock <span>in seconds.</span></h1>
+      <p>Growth, profitability, valuation and risk, scored A to F and measured against
+         the S&amp;P 500. Search a company or tap a pick below.</p>
+    </div>"""
 
 
 def format_price(value, currency="USD") -> str:
@@ -62,54 +236,115 @@ def format_price(value, currency="USD") -> str:
 
 
 def header_html(name, ticker, subtitle, price, change, currency="USD") -> str:
-    color = GAIN_COLOR if change >= 0 else LOSS_COLOR
-    sign = "+" if change >= 0 else ""
+    color = T.GAIN_COLOR if change >= 0 else T.LOSS_COLOR
+    arrow = "▲" if change >= 0 else "▼"
+    tags = "".join(f'<span class="rc-tag">{html.escape(t)}</span>' for t in subtitle.split(" · ") if t)
     return f"""
-    <div class="rc-header">
+    <div class="rc-header rc-rise">
       <div>
         <div class="rc-name">{html.escape(name)}</div>
-        <div class="rc-sub">{html.escape(ticker)} · {html.escape(subtitle)}</div>
+        <div class="rc-tags"><span class="rc-tag ticker">{html.escape(ticker)}</span>{tags}</div>
       </div>
       <div>
         <div class="rc-price">{format_price(price, currency)}</div>
-        <div class="rc-change" style="color:{color}">{sign}{change:.2%} today</div>
+        <span class="rc-change" style="color:{color};background:{_rgba(color, .12)}">
+          {arrow} {abs(change):.2%} today</span>
       </div>
     </div>"""
 
 
-def scorecard_html(card: dict) -> str:
-    """The overall grade plus one table row per category."""
-    overall = card["overall_score"]
-    overall_text = f"{overall:.0f} / 100" if overall is not None else "No data"
-    rows = ""
-    for name, category in card["categories"].items():
-        score = category["score"]
-        text_color, _ = GRADE_COLORS.get(category["grade"], GRADE_COLORS["N/A"])
-        width = 0 if score is None else score
-        score_text = "-" if score is None else f"{score:.0f}"
-        rows += f"""
-        <tr>
-          <td style="font-weight:500">{name}</td>
-          <td>{grade_chip(category["grade"])}</td>
-          <td class="rc-nowrap"><span class="rc-bar"><span style="width:{width}%;background:{text_color}"></span></span>
-              <span class="rc-num">{score_text}</span></td>
-          <td style="color:{MUTED}">{html.escape(category["summary"])}</td>
-        </tr>"""
+def stats_html(stats) -> str:
+    """A row of stat tiles. Each stat is (label, value, delta text or None, delta is good)."""
+    tiles = ""
+    for i, (label, value, delta, good) in enumerate(stats):
+        delta_html = ""
+        if delta:
+            color = T.GAIN_COLOR if good else T.LOSS_COLOR
+            delta_html = f'<div class="d" style="color:{color}">{html.escape(delta)}</div>'
+        tiles += f"""
+        <div class="rc-card rc-stat rc-rise" style="animation-delay:{i * 60}ms">
+          <div class="k">{html.escape(label)}</div><div class="v">{html.escape(value)}</div>{delta_html}
+        </div>"""
+    return f'<div class="rc-stats">{tiles}</div>'
+
+
+def _ring(grade: str, score) -> str:
+    """A circular progress ring drawn with a CSS conic gradient (Streamlit strips inline SVG)."""
+    color = grade_color(grade)
     return f"""
-    <div class="rc-overall">
-      {grade_chip(card["overall_grade"], large=True)}
-      <div><div class="label">Overall grade</div><div class="score">{overall_text}</div></div>
-    </div>
-    <table class="rc-card">
-      <tr><th>Category</th><th>Grade</th><th>Score</th><th>What it means</th></tr>
-      {rows}
-    </table>"""
+    <div class="rc-ring" style="--c:{color};--p:{score or 0:.1f}">
+      <div class="arc"></div>
+      <div class="letter" style="color:{color};text-shadow:0 0 24px {_rgba(color, .45)}">{grade}</div>
+    </div>"""
+
+
+def scorecard_html(card: dict) -> str:
+    """The overall grade ring plus one card per category."""
+    overall = card["overall_score"]
+    grade = card["overall_grade"]
+    overall_text = f"{overall:.0f} / 100" if overall is not None else "No data"
+    cats = ""
+    for i, (name, category) in enumerate(card["categories"].items()):
+        score = category["score"]
+        color = grade_color(category["grade"])
+        width = 0 if score is None else score
+        score_text = "-" if score is None else f"{score:.0f}/100"
+        cats += f"""
+        <div class="rc-card rc-cat rc-rise" style="--c:{color};animation-delay:{150 + i * 90}ms">
+          <div class="top">
+            <div class="name"><span class="icon">{CATEGORY_ICONS.get(name, "")}</span>{name}</div>
+            {grade_chip(category["grade"])}
+          </div>
+          <div class="bar"><span style="width:{width}%;animation-delay:{300 + i * 90}ms"></span></div>
+          <div class="meta"><span>{html.escape(category["summary"])}</span><b>{score_text}</b></div>
+        </div>"""
+    return f"""
+    <div class="rc-report">
+      <div class="rc-card rc-overall rc-rise">
+        {_ring(grade, overall)}
+        <div class="verdict">{VERDICTS.get(grade, "")}</div>
+        <div class="score">Overall · {overall_text}</div>
+      </div>
+      <div class="rc-cats">{cats}</div>
+    </div>"""
+
+
+def podium_html(ranked: pd.DataFrame) -> str:
+    """The top three stocks, with first place in the middle like a real podium."""
+    top = ranked.head(3).to_dict("records")
+    if not top:
+        return ""
+    medals = ["🥇", "🥈", "🥉"]
+    places = [(row, medals[i], i) for i, row in enumerate(top)]
+    order = [places[i] for i in (1, 0, 2) if i < len(places)] if len(places) >= 2 else places
+    html_places = ""
+    for row, medal, rank in order:
+        html_places += f"""
+        <div class="rc-card rc-place rc-rise{' first' if rank == 0 else ''}" style="animation-delay:{rank * 120}ms">
+          <div class="medal">{medal}</div>
+          <div class="tk">{html.escape(row["Ticker"])}</div>
+          <div class="co">{html.escape(str(row["Company"]))}</div>
+          <div style="margin-top:10px">{grade_chip(row["Overall"])}</div>
+          <div class="sc">{row["Score"]:.0f} / 100</div>
+        </div>"""
+    return f'<div class="rc-podium">{html_places}</div>'
+
+
+def grade_table_html() -> str:
+    """The grade-to-score table on the Methodology page."""
+    rows = "".join(
+        f"<tr><td>{grade_chip(g)}</td><td>{s}</td><td>{VERDICTS[g]}</td></tr>"
+        for g, s in (("A", "80 and up"), ("B", "65 to 79"), ("C", "50 to 64"),
+                     ("D", "35 to 49"), ("F", "Under 35"))
+    )
+    return (f'<div class="rc-card"><table class="rc-table"><tr><th>Grade</th><th>Score</th>'
+            f'<th>Verdict</th></tr>{rows}</table></div>')
 
 
 def grade_cell_style(grade) -> str:
     """Used to color grade cells in the comparison table."""
-    text, background = GRADE_COLORS.get(grade, GRADE_COLORS["N/A"])
-    return f"color: {text}; background-color: {background}; font-weight: 600"
+    color = grade_color(grade)
+    return f"color: {color}; background-color: {_rgba(color, .14)}; font-weight: 700"
 
 
 def format_large_number(value, currency="USD") -> str:
@@ -127,54 +362,115 @@ def format_large_number(value, currency="USD") -> str:
 def _style(fig: go.Figure, height: int = 360) -> go.Figure:
     fig.update_layout(
         height=height,
-        margin=dict(l=8, r=8, t=8, b=8),
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        font=dict(family="IBM Plex Sans, sans-serif", size=13, color="#16181D"),
+        margin={"l": 8, "r": 8, "t": 36, "b": 8},
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font={"family": "IBM Plex Sans, sans-serif", "size": 13, "color": T.TEXT},
         hovermode="x unified",
-        legend=dict(orientation="h", y=1.08, x=0),
+        hoverlabel={"bgcolor": T.PANEL, "bordercolor": T.BORDER, "font": {"color": T.TEXT}},
+        legend={"orientation": "h", "y": 1.1, "x": 0, "bgcolor": "rgba(0,0,0,0)"},
     )
-    fig.update_xaxes(showgrid=False, linecolor="#DFE2E6")
-    fig.update_yaxes(gridcolor="#EEF0F2", zeroline=False)
+    fig.update_xaxes(showgrid=False, linecolor=T.BORDER, tickfont={"color": T.MUTED})
+    fig.update_yaxes(gridcolor=T.GRID, zeroline=False, tickfont={"color": T.MUTED})
     return fig
+
+
+def _gradient(color: str, top_alpha: float) -> dict:
+    """A fill that fades from the line color down to transparent."""
+    return {"type": "vertical", "colorscale": [[0, _rgba(color, 0)], [1, _rgba(color, top_alpha)]]}
 
 
 def growth_chart(stock: pd.Series, market: pd.Series, ticker: str) -> go.Figure:
     fig = go.Figure()
     fig.add_scatter(x=market.index, y=market, name="S&P 500 (SPY)",
-                    line=dict(color=MARKET_COLOR, width=1.5))
-    fig.add_scatter(x=stock.index, y=stock, name=ticker, line=dict(color=STOCK_COLOR, width=2))
-    fig.update_yaxes(tickprefix="$", tickformat=",.0f")
-    fig.update_traces(hovertemplate="$%{y:,.0f}")
+                    line={"color": T.MARKET_COLOR, "width": 1.5, "dash": "dot"})
+    fig.add_scatter(x=stock.index, y=stock, name=ticker, line={"color": T.STOCK_COLOR, "width": 2.5},
+                    fill="tozeroy", fillgradient=_gradient(T.STOCK_COLOR, 0.35))
+    # Mark where each line ends so the final values pop.
+    for series, color in ((market, T.MARKET_COLOR), (stock, T.STOCK_COLOR)):
+        fig.add_scatter(x=[series.index[-1]], y=[series.iloc[-1]], mode="markers", showlegend=False,
+                        marker={"size": 9, "color": color, "line": {"width": 3, "color": _rgba(color, .3)}},
+                        hoverinfo="skip")
+    fig.add_hline(y=10_000, line={"color": T.MUTED, "width": 1, "dash": "dash"})
+    fig.update_yaxes(tickprefix="$", tickformat=",.0f", rangemode="tozero")
+    fig.update_traces(hovertemplate="$%{y:,.0f}", selector={"mode": "lines"})
     return _style(fig)
 
 
 def drawdown_chart(drawdown: pd.Series) -> go.Figure:
     fig = go.Figure()
-    fig.add_scatter(x=drawdown.index, y=drawdown, fill="tozeroy", name="Below peak",
-                    line=dict(color=LOSS_COLOR, width=1), fillcolor="rgba(185, 28, 28, 0.12)",
+    fig.add_scatter(x=drawdown.index, y=drawdown, name="Below peak", mode="lines",
+                    line={"color": T.LOSS_COLOR, "width": 1.5}, fill="tozeroy",
+                    fillgradient={"type": "vertical",
+                                  "colorscale": [[0, _rgba(T.LOSS_COLOR, .4)], [1, _rgba(T.LOSS_COLOR, 0)]]},
                     hovertemplate="%{y:.1%}")
+    worst = drawdown.idxmin()
+    fig.add_annotation(x=worst, y=drawdown.min(), text=f"Worst: {drawdown.min():.0%}", showarrow=True,
+                       arrowcolor=T.LOSS_COLOR, font={"color": T.LOSS_COLOR, "family": "JetBrains Mono"},
+                       ay=30, bgcolor=T.PANEL, bordercolor=_rgba(T.LOSS_COLOR, .4))
     fig.update_yaxes(tickformat=".0%")
-    return _style(fig, height=280)
+    fig = _style(fig, height=300)
+    fig.update_layout(showlegend=False)
+    return fig
 
 
 def risk_return_chart(table: pd.DataFrame) -> go.Figure:
     """Classic finance chart: yearly return (up) vs. volatility (right).
 
     Up and to the left is the best place to be: high return, low risk.
+    Each stock's dot is colored by its overall grade.
     """
     is_market = table["Ticker"] == "SPY"
+    stocks, market = table[~is_market], table[is_market]
     fig = go.Figure()
-    for subset, color, name in ((table[~is_market], STOCK_COLOR, "Stocks"),
-                                (table[is_market], MARKET_COLOR, "S&P 500")):
-        fig.add_scatter(
-            x=subset["Volatility"], y=subset["Yearly return"], mode="markers+text",
-            text=subset["Ticker"], textposition="top center", name=name,
-            marker=dict(size=12, color=color),
-            hovertemplate="%{text}<br>Return %{y:.1%}<br>Volatility %{x:.1%}<extra></extra>",
-        )
+    fig.add_scatter(
+        x=stocks["Volatility"], y=stocks["Yearly return"], mode="markers+text",
+        text=stocks["Ticker"], textposition="top center", textfont={"family": "JetBrains Mono", "color": T.TEXT},
+        marker={"size": 18, "color": [grade_color(g) for g in stocks["Overall"]],
+                "line": {"width": 4, "color": [_rgba(grade_color(g), .25) for g in stocks["Overall"]]}},
+        customdata=stocks["Overall"],
+        hovertemplate="%{text} · grade %{customdata}<br>Return %{y:.1%}<br>Volatility %{x:.1%}<extra></extra>",
+    )
+    fig.add_scatter(
+        x=market["Volatility"], y=market["Yearly return"], mode="markers+text", text=["S&P 500"],
+        textposition="bottom center", textfont={"color": T.MUTED},
+        marker={"size": 14, "color": T.MARKET_COLOR, "symbol": "diamond"},
+        hovertemplate="S&P 500<br>Return %{y:.1%}<br>Volatility %{x:.1%}<extra></extra>",
+    )
+    if len(market):
+        fig.add_vline(x=market["Volatility"].iloc[0], line={"color": T.GRID, "dash": "dot"})
+        fig.add_hline(y=market["Yearly return"].iloc[0], line={"color": T.GRID, "dash": "dot"})
     fig.update_xaxes(title="Volatility (yearly)", tickformat=".0%")
     fig.update_yaxes(title="Average yearly return", tickformat=".0%")
-    fig = _style(fig, height=420)
+    fig = _style(fig, height=440)
     fig.update_layout(hovermode="closest", showlegend=False)
+    return fig
+
+
+def radar_chart(table: pd.DataFrame, categories) -> go.Figure:
+    """One outline per stock across the four category scores. Bigger shape = better stock.
+
+    Stocks missing a category (common for funds) are left out, since a gap would
+    look like a score of zero.
+    """
+    palette = ["#60A5FA", "#F472B6", "#34D399", "#FBBF24", "#A78BFA", "#22D3EE", "#FB923C", "#F87171"]
+    axes = [*categories, categories[0]]  # repeat the first point to close the shape
+    fig = go.Figure()
+    for i, row in enumerate(table.to_dict("records")):
+        color = palette[i % len(palette)]
+        scores = [row.get(f"{c} score") for c in axes]
+        if any(score is None or score != score for score in scores):  # None or NaN
+            continue
+        fig.add_scatterpolar(r=scores, theta=axes, name=row["Ticker"], fill="toself",
+                             line={"color": color, "width": 2}, fillcolor=_rgba(color, .12),
+                             hovertemplate="%{theta}: %{r:.0f}<extra>" + row["Ticker"] + "</extra>")
+    fig.update_layout(
+        polar={"bgcolor": "rgba(0,0,0,0)",
+               "radialaxis": {"range": [0, 100], "gridcolor": T.GRID,
+                              "showticklabels": False, "linecolor": "rgba(0,0,0,0)"},
+               "angularaxis": {"gridcolor": T.GRID, "linecolor": T.BORDER,
+                               "tickfont": {"color": T.TEXT, "family": "Space Grotesk", "size": 14}}},
+    )
+    fig = _style(fig, height=460)
+    fig.update_layout(hovermode="closest", legend={"y": -0.08, "orientation": "h"})
     return fig

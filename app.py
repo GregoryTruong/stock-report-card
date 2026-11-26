@@ -1,15 +1,43 @@
 """Stock Report Card: the web app. Run it with:  streamlit run app.py"""
 
+import json
+
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
-from src.data import MARKET_TICKER, get_company_info, get_price_history, search_tickers
-from src.grading import CATEGORIES, build_report_card
-from src.metrics import annualized_volatility, collect_metrics, drawdown_series, growth_of_10k
 from src import ui
+from src.data import MARKET_TICKER, get_company_info, get_price_history, rank_matches, search_tickers
+from src.grading import CATEGORIES, build_report_card
+from src.metrics import collect_metrics, drawdown_series, growth_of_10k
 
-st.set_page_config(page_title="Stock Report Card", layout="wide")
-st.html(ui.CSS)
+st.set_page_config(page_title="Stock Report Card", page_icon="📈", layout="wide")
+
+
+def current_theme() -> str:
+    """"dark" or "light": whichever theme Streamlit is showing this visitor."""
+    theme_type = getattr(getattr(st.context, "theme", None), "type", None)
+    return theme_type if theme_type in ("dark", "light") else "dark"
+
+
+def switch_theme(mode: str):
+    """Flip Streamlit's theme by saving the choice where Streamlit looks for it, then reloading.
+
+    Streamlit has no Python call to change the theme, but it remembers each
+    visitor's pick in the browser's localStorage. The page, ticker and time
+    period are kept in the URL, so the reload lands right back where you were.
+    """
+    choice = json.dumps("Dark" if mode == "dark" else "Light")
+    components.html(f"""<script>
+      const w = window.parent;
+      w.localStorage.setItem(`stActiveTheme-${{w.location.pathname}}-v2`, JSON.stringify({choice}));
+      w.location.reload();
+    </script>""", height=0)
+
+
+THEME = current_theme()
+ui.set_theme(THEME)
+st.html(ui.css())
 
 # Ready-made groups of tickers so people can explore without knowing symbols.
 PRESETS = {
@@ -19,6 +47,17 @@ PRESETS = {
     "Everyday brands": ["KO", "PEP", "PG", "WMT", "MCD", "NKE"],
 }
 PERIODS = {"1Y": "1y", "3Y": "3y", "5Y": "5y", "10Y": "10y"}
+PAGES = {"Report card": "🎓", "Compare": "⚔️", "Methodology": "📐"}
+
+# The page, search and time period live in the URL (e.g. ?page=Compare&q=TSLA),
+# so links can be shared and switching themes doesn't lose your place.
+params = st.query_params
+if "query" not in st.session_state:
+    st.session_state.query = params.get("q", "AAPL")
+if "page" not in st.session_state:
+    st.session_state.page = params.get("page") if params.get("page") in PAGES else "Report card"
+if "period_label" not in st.session_state:
+    st.session_state.period_label = params.get("period") if params.get("period") in PERIODS else "5Y"
 
 
 # st.cache_data saves results for an hour so we don't re-download
@@ -33,19 +72,20 @@ def load_stock(ticker: str, period: str):
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def find_stocks(query: str):
-    """Search by company name or ticker. Exact ticker matches go first.
+def search_cached(query: str):
+    return search_tickers(query)
 
-    Yahoo's search hides stocks that stopped trading (like EA), so if the query
-    looks like a ticker we always try it directly. That way the user gets a real
-    explanation instead of a different company with a similar name.
+
+def find_stocks(query: str):
+    """Search by company name or ticker, with an exact ticker match first.
+
+    If Yahoo's search is down or errors, we still try the query as a ticker.
     """
-    matches = search_tickers(query)
-    symbol = query.upper()
-    looks_like_ticker = " " not in symbol and len(symbol) <= 10
-    if looks_like_ticker and symbol not in {m["symbol"].upper() for m in matches}:
-        matches.insert(0, {"symbol": symbol, "name": "", "exchange": ""})
-    return sorted(matches, key=lambda m: m["symbol"].upper() != symbol)
+    try:
+        matches = search_cached(query)
+    except Exception:
+        matches = []
+    return rank_matches(query, matches)
 
 
 def use_preset_ticker():
@@ -62,21 +102,25 @@ def use_preset_group():
 
 # ------------------------------------------------------------------ Sidebar
 with st.sidebar:
-    st.markdown("### Stock Report Card")
-    page = st.radio("Page", ["Report card", "Compare", "Methodology"],
+    st.markdown("### 📈 Stock Report Card")
+    page = st.radio("Page", list(PAGES), key="page", format_func=lambda p: f"{PAGES[p]}  {p}",
                     label_visibility="collapsed")
     st.divider()
-    period_label = st.segmented_control("Time period", list(PERIODS), default="5Y",
+    period_label = st.segmented_control("Time period", list(PERIODS), key="period_label",
                                         help="Used for the risk metrics and the charts.")
     period = PERIODS.get(period_label or "5Y")
+    st.divider()
+    dark_mode = st.toggle("🌙 Dark mode", value=THEME == "dark")
+    if dark_mode != (THEME == "dark"):
+        switch_theme("dark" if dark_mode else "light")
     st.caption("For learning purposes only. Not financial advice.")
+
+st.query_params.update(page=page, period=period_label or "5Y", q=st.session_state.query)
 
 
 # -------------------------------------------------------------- Report card
 def report_card_page():
-    if "query" not in st.session_state:
-        st.session_state.query = "AAPL"
-
+    st.html(ui.hero_html())
     search, picks = st.columns([1, 2], vertical_alignment="bottom")
     with search:
         st.text_input("Search a company or ticker", key="query",
@@ -89,10 +133,7 @@ def report_card_page():
     query = st.session_state.query.strip()
     if not query:
         return
-    try:
-        matches = find_stocks(query)
-    except Exception:
-        matches = []
+    matches = find_stocks(query)
     if not matches:
         st.warning(f'No stocks found for "{query}". Try the full company name or a ticker.')
         return
@@ -115,20 +156,21 @@ def report_card_page():
 
     day_change = prices.iloc[-1] / prices.iloc[-2] - 1
     subtitle = " · ".join(x for x in (info.get("sector"), info.get("industry")) if x) or "Fund"
-    st.html(ui.header_html(info.get("longName", ticker), ticker, subtitle,
-                           prices.iloc[-1], day_change, info.get("currency", "USD")))
+    currency = info.get("currency") or "USD"
+    st.html(ui.header_html(info.get("longName") or ticker, ticker, subtitle,
+                           prices.iloc[-1], day_change, currency))
 
-    stats = st.columns(4)
-    currency = info.get("currency", "USD")
+    excess = metrics["annual_return"] - metrics["market_annual_return"]
     cap_label = "Market cap" if currency == "USD" else f"Market cap ({currency})"
-    stats[0].metric(cap_label, ui.format_large_number(info.get("marketCap"), currency))
-    stats[1].metric(f"Yearly return ({period_label})", f"{metrics['annual_return']:.1%}",
-                    delta=f"{metrics['annual_return'] - metrics['market_annual_return']:+.1%} vs market")
-    stats[2].metric("Max drop", f"{metrics['max_drawdown']:.0%}")
-    stats[3].metric("Beta", f"{metrics['beta']:.2f}",
-                    help="1.0 moves with the market, 2.0 moves twice as much.")
+    st.html(ui.stats_html([
+        (cap_label, ui.format_large_number(info.get("marketCap"), currency), None, True),
+        (f"Yearly return · {period_label}", f"{metrics['annual_return']:.1%}",
+         f"{excess:+.1%} vs S&P 500", excess >= 0),
+        ("Worst drop", f"{metrics['max_drawdown']:.0%}", None, True),
+        ("Beta", f"{metrics['beta']:.2f}",
+         "calmer than market" if metrics["beta"] < 1 else "swings more than market", metrics["beta"] < 1),
+    ]))
 
-    st.subheader("Report card")
     st.html(ui.scorecard_html(card))
 
     with st.expander("See every metric behind the grades"):
@@ -144,7 +186,7 @@ def report_card_page():
         )
 
     st.subheader("Performance")
-    growth_tab, drawdown_tab = st.tabs(["Growth of $10,000", "Drops from peak"])
+    growth_tab, drawdown_tab = st.tabs(["📈 Growth of $10,000", "📉 Drops from peak"])
     with growth_tab:
         st.plotly_chart(
             ui.growth_chart(growth_of_10k(prices), growth_of_10k(market_prices), ticker),
@@ -172,15 +214,16 @@ def compare_page():
     with st.spinner("Loading..."):
         for t in dict.fromkeys(tickers + [MARKET_TICKER]):  # dedupe, keep order, add the market
             try:
-                info, prices, _, metrics, card = load_stock(t, period)
+                info, _, _, metrics, card = load_stock(t, period)
             except Exception as error:
                 st.warning(f"Skipped {t}: {error}")
                 continue
-            row = {"Ticker": t, "Company": info.get("shortName", t),
+            row = {"Ticker": t, "Company": info.get("shortName") or t,
                    "Overall": card["overall_grade"], "Score": card["overall_score"] or 0}
             row.update({name: c["grade"] for name, c in card["categories"].items()})
+            row.update({f"{name} score": c["score"] for name, c in card["categories"].items()})
             row["Yearly return"] = metrics["annual_return"]
-            row["Volatility"] = annualized_volatility(prices)
+            row["Volatility"] = metrics["volatility"]
             rows.append(row)
 
     if not rows:
@@ -189,8 +232,10 @@ def compare_page():
     ranked = table[table["Ticker"] != MARKET_TICKER].sort_values("Score", ascending=False)
 
     grade_columns = ["Overall", *CATEGORIES]
+    st.html(ui.podium_html(ranked))
+    score_columns = [f"{name} score" for name in CATEGORIES]
     st.dataframe(
-        ranked.style.map(ui.grade_cell_style, subset=grade_columns),
+        ranked.drop(columns=score_columns).style.map(ui.grade_cell_style, subset=grade_columns),
         hide_index=True, use_container_width=True,
         column_config={
             "Score": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.0f"),
@@ -205,6 +250,11 @@ def compare_page():
                "market with less risk.")
     st.plotly_chart(ui.risk_return_chart(table), use_container_width=True)
 
+    st.subheader("Strengths at a glance")
+    st.caption("Each shape shows a stock's four category scores. The bigger the shape, the better "
+               "the all-round grade. Click names in the legend to hide or show them.")
+    st.plotly_chart(ui.radar_chart(ranked, list(CATEGORIES)), use_container_width=True)
+
 
 # -------------------------------------------------------------- Methodology
 def methodology_page():
@@ -216,15 +266,7 @@ Each metric gets a **score from 0 to 100** based on where it falls between a
 the overall grade is the average of the four categories.
 """
     )
-    st.html(
-        '<table class="rc-card"><tr><th>Grade</th><th>Score</th></tr>'
-        + "".join(
-            f"<tr><td>{ui.grade_chip(g)}</td><td>{s}</td></tr>"
-            for g, s in (("A", "80 and up"), ("B", "65 to 79"), ("C", "50 to 64"),
-                         ("D", "35 to 49"), ("F", "Under 35"))
-        )
-        + "</table>"
-    )
+    st.html(ui.grade_table_html())
     rows = [
         {"Category": name, "Metric": label,
          "Worst (score 0)": worst, "Best (score 100)": best,

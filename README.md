@@ -1,5 +1,10 @@
 # Stock Report Card
 
+[![Tests](https://github.com/GregoryTruong/stock-report-card/actions/workflows/tests.yml/badge.svg)](https://github.com/GregoryTruong/stock-report-card/actions/workflows/tests.yml)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://stock-report-card.streamlit.app)
+
+**Live demo: [stock-report-card.streamlit.app](https://stock-report-card.streamlit.app)**
+
 A web app that grades any stock on Yahoo Finance (search by company name, including non-US
 stocks like Aritzia on the Toronto exchange) from **A to F** on four things analysts look at
 (**growth, profitability, valuation, and risk**) and compares it to the S&P 500.
@@ -55,11 +60,25 @@ tests/               Unit tests on made-up data with known answers
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 streamlit run app.py
 ```
 
-Run the tests with `pytest`.
+Run the tests with `pytest` and the linter with `ruff check .`.
+Both run automatically on every push and pull request via GitHub Actions.
+
+## Deploy it for free
+
+The app runs on [Streamlit Community Cloud](https://streamlit.io/cloud) with no changes:
+
+1. Sign in at [share.streamlit.io](https://share.streamlit.io) with your GitHub account.
+2. Click **Create app**, pick this repository, branch `main`, and main file `app.py`.
+3. Under **Advanced settings**, choose Python 3.13, then click **Deploy**.
+
+Streamlit installs `requirements.txt` and reads the theme from `.streamlit/config.toml`.
+Every push to `main` redeploys the site automatically. Yahoo Finance sometimes rate-limits
+shared cloud servers; the app caches data for an hour to keep requests low, and shows a
+clear error if a download fails.
 
 ## Limitations and next steps
 

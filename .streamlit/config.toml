@@ -1,20 +1,37 @@
 # App-wide look: colors, fonts and toolbar. Streamlit reads this automatically.
+# There are two palettes. Visitors start on their device's setting and can flip
+# between them with the "Dark mode" switch in the sidebar.
 
 [theme]
-base = "light"
-primaryColor = "#0F766E"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F4F5F7"
-textColor = "#16181D"
-borderColor = "#DFE2E6"
 showWidgetBorder = true
-baseRadius = "6px"
+baseRadius = "10px"
 font = "IBM Plex Sans:https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
-codeFont = "IBM Plex Mono:https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap"
-headingFontWeights = 600
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap"
+headingFontWeights = 700
 
-[theme.sidebar]
-backgroundColor = "#F4F5F7"
+# Late-night dashboard: near-black with electric blue accents.
+[theme.dark]
+base = "dark"
+primaryColor = "#3B82F6"
+backgroundColor = "#0B0F17"
+secondaryBackgroundColor = "#131A26"
+textColor = "#E6EAF2"
+borderColor = "#1E293B"
+
+[theme.dark.sidebar]
+backgroundColor = "#0E131D"
+
+# Daytime: soft off-white with the same blue.
+[theme.light]
+base = "light"
+primaryColor = "#2563EB"
+backgroundColor = "#F5F7FB"
+secondaryBackgroundColor = "#EAEFF7"
+textColor = "#0F172A"
+borderColor = "#D8DEE9"
+
+[theme.light.sidebar]
+backgroundColor = "#FFFFFF"
 
 [client]
 toolbarMode = "minimal"

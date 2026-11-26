@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+# pycodestyle errors/warnings, pyflakes, import sorting, and common bug patterns.
+select = ["E", "W", "F", "I", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
