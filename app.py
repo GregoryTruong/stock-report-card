@@ -6,7 +6,7 @@ import streamlit as st
 from src import ui
 from src.data import MARKET_TICKER, get_company_info, get_price_history, rank_matches, search_tickers
 from src.grading import CATEGORIES, build_report_card
-from src.metrics import annualized_volatility, collect_metrics, drawdown_series, growth_of_10k
+from src.metrics import collect_metrics, drawdown_series, growth_of_10k
 
 st.set_page_config(page_title="Stock Report Card", layout="wide")
 st.html(ui.CSS)
@@ -113,11 +113,11 @@ def report_card_page():
 
     day_change = prices.iloc[-1] / prices.iloc[-2] - 1
     subtitle = " · ".join(x for x in (info.get("sector"), info.get("industry")) if x) or "Fund"
-    st.html(ui.header_html(info.get("longName", ticker), ticker, subtitle,
-                           prices.iloc[-1], day_change, info.get("currency", "USD")))
+    currency = info.get("currency") or "USD"
+    st.html(ui.header_html(info.get("longName") or ticker, ticker, subtitle,
+                           prices.iloc[-1], day_change, currency))
 
     stats = st.columns(4)
-    currency = info.get("currency", "USD")
     cap_label = "Market cap" if currency == "USD" else f"Market cap ({currency})"
     stats[0].metric(cap_label, ui.format_large_number(info.get("marketCap"), currency))
     stats[1].metric(f"Yearly return ({period_label})", f"{metrics['annual_return']:.1%}",
@@ -170,15 +170,15 @@ def compare_page():
     with st.spinner("Loading..."):
         for t in dict.fromkeys(tickers + [MARKET_TICKER]):  # dedupe, keep order, add the market
             try:
-                info, prices, _, metrics, card = load_stock(t, period)
+                info, _, _, metrics, card = load_stock(t, period)
             except Exception as error:
                 st.warning(f"Skipped {t}: {error}")
                 continue
-            row = {"Ticker": t, "Company": info.get("shortName", t),
+            row = {"Ticker": t, "Company": info.get("shortName") or t,
                    "Overall": card["overall_grade"], "Score": card["overall_score"] or 0}
             row.update({name: c["grade"] for name, c in card["categories"].items()})
             row["Yearly return"] = metrics["annual_return"]
-            row["Volatility"] = annualized_volatility(prices)
+            row["Volatility"] = metrics["volatility"]
             rows.append(row)
 
     if not rows:
