@@ -67,3 +67,16 @@ def test_light_theme_swaps_colors_only_for_this_thread():
         assert seen["other"] == ui.THEMES["dark"]["GRADE_COLORS"]["A"]
     finally:
         ui.set_theme("dark")
+
+
+def test_app_uses_line_icons_not_emoji():
+    import re
+    from pathlib import Path
+
+    from src.ui import CATEGORY_ICONS, ICONS, icon
+
+    emoji = re.compile("[\U0001F000-\U0001FAFF☀-➿]")
+    for path in ("app.py", "src/ui.py"):
+        assert not emoji.search(Path(path).read_text(encoding="utf-8")), f"emoji found in {path}"
+    assert set(CATEGORY_ICONS.values()) <= set(ICONS)
+    assert 'class="rc-icon rc-i-shield"' in icon("shield")

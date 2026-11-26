@@ -2,6 +2,7 @@
 
 import html
 import threading
+from urllib.parse import quote
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -42,7 +43,46 @@ VERDICTS = {
     "F": "Struggling",
     "N/A": "Not enough data",
 }
-CATEGORY_ICONS = {"Growth": "🚀", "Profitability": "💰", "Valuation": "🏷️", "Risk": "🛡️"}
+
+# Line icons from Lucide (https://lucide.dev, ISC license): the inner SVG of each
+# 24x24 icon. Streamlit strips inline <svg>, so icon() draws them as a CSS mask
+# filled with the current text color.
+ICONS = {
+    "trending-up": '<path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/>',
+    "dollar": ('<circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/>'
+               '<path d="M12 18V6"/>'),
+    "scale": ('<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/>'
+              '<path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/>'
+              '<path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>'),
+    "shield": ('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1'
+               'c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>'),
+    "trophy": ('<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>'
+               '<path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>'
+               '<path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>'
+               '<path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>'),
+    "arrow-up": '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
+    "arrow-down": '<path d="m7 7 10 10"/><path d="M17 7v10H7"/>',
+}
+CATEGORY_ICONS = {"Growth": "trending-up", "Profitability": "dollar", "Valuation": "scale", "Risk": "shield"}
+
+
+def _icon_css() -> str:
+    """One CSS class per icon (rc-i-<name>) that draws it as a mask filled with the text color.
+
+    Streamlit strips inline <svg> and inline mask styles, so the icons live in the stylesheet.
+    """
+    rules = []
+    for name, body in ICONS.items():
+        svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" '
+               f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{body}</svg>')
+        mask = f'url("data:image/svg+xml,{quote(svg)}") center / contain no-repeat'
+        rules.append(f".rc-i-{name} {{ -webkit-mask: {mask}; mask: {mask}; }}")
+    return "\n".join(rules)
+
+
+def icon(name: str, size: int = 18) -> str:
+    """An inline line icon that takes the color of the text around it."""
+    return f'<span class="rc-icon rc-i-{name}" style="width:{size}px;height:{size}px"></span>'
 
 
 class _Palette(threading.local):
@@ -133,7 +173,8 @@ h1, h2, h3 {{ font-family: {DISPLAY} !important; letter-spacing: -0.02em; }}
 .rc-tag.ticker {{ font-family: {MONO}; color: {T.STOCK_COLOR}; border-color: {_rgba(T.STOCK_COLOR, .4)}; }}
 .rc-price {{ font-family: {MONO}; font-size: clamp(1.6rem, 3vw, 2.1rem); font-weight: 600;
   text-align: right; color: {T.TEXT}; }}
-.rc-change {{ display: inline-block; font-family: {MONO}; font-size: .85rem; font-weight: 600;
+.rc-change {{ display: inline-flex; align-items: center; gap: 4px; font-family: {MONO}; font-size: .85rem;
+  font-weight: 600;
   padding: 3px 10px; border-radius: 999px; float: right; margin-top: 4px; }}
 
 /* Stat tiles */
@@ -163,7 +204,11 @@ h1, h2, h3 {{ font-family: {DISPLAY} !important; letter-spacing: -0.02em; }}
 .rc-cat::before {{ content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--c); }}
 .rc-cat .top {{ display: flex; justify-content: space-between; align-items: center; }}
 .rc-cat .name {{ font-family: {DISPLAY}; font-size: 1.05rem; font-weight: 600; color: {T.TEXT}; }}
-.rc-cat .icon {{ margin-right: 8px; }}
+.rc-icon {{ display: inline-block; flex: none; background: currentColor; vertical-align: -0.15em; }}
+{_icon_css()}
+.rc-cat .name {{ display: flex; align-items: center; gap: 10px; }}
+.rc-cat .glyph {{ display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 9px;
+  color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }}
 .rc-cat .bar {{ height: 6px; border-radius: 3px; background: {T.TRACK};
   margin: 14px 0 10px; overflow: hidden; }}
 .rc-cat .bar span {{ display: block; height: 100%; border-radius: 3px;
@@ -179,7 +224,9 @@ h1, h2, h3 {{ font-family: {DISPLAY} !important; letter-spacing: -0.02em; }}
 .rc-podium {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;
   align-items: end; margin: 8px 0 20px; }}
 .rc-place {{ text-align: center; }}
-.rc-place .medal {{ font-size: 1.8rem; }}
+.rc-place .rank {{ display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  font-family: {DISPLAY}; font-weight: 700; font-size: 1.05rem; color: var(--m);
+  border: 1.5px solid var(--m); background: color-mix(in srgb, var(--m) 12%, transparent); }}
 .rc-place .tk {{ font-family: {MONO}; font-size: 1.3rem; font-weight: 600; color: {T.TEXT}; margin-top: 4px; }}
 .rc-place .co {{ font-size: .82rem; color: {T.MUTED}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 .rc-place .sc {{ font-family: {MONO}; font-size: .85rem; color: {T.MUTED}; margin-top: 8px; }}
@@ -237,7 +284,7 @@ def format_price(value, currency="USD") -> str:
 
 def header_html(name, ticker, subtitle, price, change, currency="USD") -> str:
     color = T.GAIN_COLOR if change >= 0 else T.LOSS_COLOR
-    arrow = "▲" if change >= 0 else "▼"
+    arrow = icon("arrow-up" if change >= 0 else "arrow-down", 14)
     tags = "".join(f'<span class="rc-tag">{html.escape(t)}</span>' for t in subtitle.split(" · ") if t)
     return f"""
     <div class="rc-header rc-rise">
@@ -292,7 +339,7 @@ def scorecard_html(card: dict) -> str:
         cats += f"""
         <div class="rc-card rc-cat rc-rise" style="--c:{color};animation-delay:{150 + i * 90}ms">
           <div class="top">
-            <div class="name"><span class="icon">{CATEGORY_ICONS.get(name, "")}</span>{name}</div>
+            <div class="name"><span class="glyph">{icon(CATEGORY_ICONS[name])}</span>{name}</div>
             {grade_chip(category["grade"])}
           </div>
           <div class="bar"><span style="width:{width}%;animation-delay:{300 + i * 90}ms"></span></div>
@@ -314,14 +361,14 @@ def podium_html(ranked: pd.DataFrame) -> str:
     top = ranked.head(3).to_dict("records")
     if not top:
         return ""
-    medals = ["🥇", "🥈", "🥉"]
+    medals = ["#E3B341", "#A8B3C4", "#C98A5A"]  # gold, silver, bronze
     places = [(row, medals[i], i) for i, row in enumerate(top)]
     order = [places[i] for i in (1, 0, 2) if i < len(places)] if len(places) >= 2 else places
     html_places = ""
     for row, medal, rank in order:
         html_places += f"""
         <div class="rc-card rc-place rc-rise{' first' if rank == 0 else ''}" style="animation-delay:{rank * 120}ms">
-          <div class="medal">{medal}</div>
+          <div class="rank" style="--m:{medal}">{icon("trophy", 20) if rank == 0 else rank + 1}</div>
           <div class="tk">{html.escape(row["Ticker"])}</div>
           <div class="co">{html.escape(str(row["Company"]))}</div>
           <div style="margin-top:10px">{grade_chip(row["Overall"])}</div>
