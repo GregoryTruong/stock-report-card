@@ -1,6 +1,9 @@
 # Stock Report Card
 
 [![Tests](https://github.com/GregoryTruong/stock-report-card/actions/workflows/tests.yml/badge.svg)](https://github.com/GregoryTruong/stock-report-card/actions/workflows/tests.yml)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://stock-report-card.streamlit.app)
+
+**Live demo: [stock-report-card.streamlit.app](https://stock-report-card.streamlit.app)**
 
 A web app that grades any stock on Yahoo Finance (search by company name, including non-US
 stocks like Aritzia on the Toronto exchange) from **A to F** on four things analysts look at
