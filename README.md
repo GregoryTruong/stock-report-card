@@ -66,6 +66,9 @@ streamlit run app.py
 
 Run the tests with `pytest` and the linter with `ruff check .`.
 Both run automatically on every push and pull request via GitHub Actions.
+Every pull request also gets an automatic review from Claude (`.github/workflows/claude-review.yml`),
+which comments on likely bugs and missing tests. It turns on once the repository has an
+`ANTHROPIC_API_KEY` secret.
 
 ## Deploy it for free
 
