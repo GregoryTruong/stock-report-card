@@ -5,22 +5,24 @@
 
 **Live demo: [stock-report-card.streamlit.app](https://stock-report-card.streamlit.app)**
 
-A web app that grades any stock on Yahoo Finance (search by company name, including non-US
-stocks like Aritzia on the Toronto exchange) from **A to F** on four things analysts look at
-(**growth, profitability, valuation, and risk**) and compares it to the S&P 500.
+Type in a company, get a report card. The app pulls the stock from Yahoo Finance (US or
+not: Aritzia on the Toronto exchange works too) and grades it **A to F** in four subjects:
+**growth, profitability, valuation and risk**. Each grade comes with a one-line comment,
+and the risk numbers are measured against the S&P 500.
 
-Most student stock projects try to *predict* prices, which even professionals can't
-do reliably. This project does what an analyst actually does instead: break a
-company down, measure it against benchmarks, and explain the results in plain English.
+I built it to practice the kind of breakdown an equity analyst writes up: pick a few
+numbers that matter, set clear cutoffs, and explain the result in plain English. It doesn't
+try to predict prices.
 
-## Features
+## What's in it
 
-- **Report card:** type a ticker (e.g. `AAPL`) and get an overall grade, four category
-  grades, and a one-sentence explanation for each.
-- **$10,000 growth chart:** what $10k invested in the stock would be worth today
-  vs. the same amount in the S&P 500.
-- **Drawdown chart:** how far the stock fell below its peak over time.
-- **Compare stocks:** rank a list of tickers side by side.
+- **Report card:** an overall grade, a grade and comment for each subject, and every
+  metric behind them if you want to check the math.
+- **Growth of $10,000:** what $10k in the stock would be worth today next to the same
+  amount in the S&P 500.
+- **Drops from peak:** how far the stock fell below its high, day by day.
+- **Compare:** rank a list of tickers, with a risk vs. return chart.
+- **Dark and light mode**, and links that keep your stock, page and time period.
 
 ## How the grading works
 
@@ -50,7 +52,7 @@ app.py               Web app: layout, charts, tabs
 src/data.py          Downloads prices and company info
 src/metrics.py       Financial math (returns, volatility, drawdown, beta)
 src/grading.py       Converts metrics into scores and letter grades
-src/ui.py            Colors, the scorecard table and chart styling
+src/ui.py            Both themes, the report card layout and chart styling
 .streamlit/          App theme (colors and fonts)
 tests/               Unit tests on made-up data with known answers
 ```
@@ -85,4 +87,5 @@ clear error if a download fails.
 - The cutoffs are general rules of thumb. A software company and a grocery chain have
   very different "normal" margins, so a next step is grading against **industry peers**.
 - Yahoo Finance data can be missing for some tickers (ETFs have no profit margin, for example).
-- Good grades don't mean the price will go up. This is an analysis tool, not financial advice.
+- Good grades don't mean the price will go up. Nothing here is financial advice; see the
+  Terms & privacy page in the app.
