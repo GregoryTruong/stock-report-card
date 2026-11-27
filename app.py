@@ -67,7 +67,7 @@ st.html(ui.css())
 WATCHLIST = {
     "ATZ.TO": "Fashion. Aritzia is a Canadian clothing brand.",
     "SHOP.TO": "Tech. Shopify is a Canadian online store platform.",
-    "NVDA": "Tech and gaming. Nvidia makes GeForce graphics cards.",
+    "NVDA": "Tech and gaming. Nvidia makes GeForce graphics cards and AI chips.",
     "SONY": "Gaming. Sony makes the PlayStation.",
     "RACE": "Cars. Ferrari.",
     "NKE": "Sports and fashion. Nike.",
@@ -344,8 +344,8 @@ stock moves when the S&P 500 moves).
 **Why these cutoffs.** Each one is my own call, based on what's normal for a big
 US company:
 
-- **Profit margin, best at 25%.** The average S&P 500 company keeps roughly 11 to 13 cents
-  of each sales dollar as profit, so 25% is about double the norm. Zero or less scores 0.
+- **Profit margin, best at 25%.** S&P 500 companies have kept about 11 to 13 cents of each
+  sales dollar as profit in recent years (less over the long run), so 25% is about double that. Zero or less scores 0.
 - **Revenue growth, best at 25% a year.** Most large companies grow in the single digits,
   so 25% is fast. Shrinking scores 0.
 - **P/E, best at 12 and worst at 40.** The S&P 500 has averaged around 16 over the long
