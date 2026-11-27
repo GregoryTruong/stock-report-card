@@ -14,6 +14,14 @@ I built it to practice the kind of breakdown an equity analyst writes up: pick a
 numbers that matter, set clear cutoffs, and explain the result in plain English. It doesn't
 try to predict prices.
 
+## Why I built this
+
+I wanted to open a TFSA and stop leaving my money in a savings account where it barely
+grew. Before putting money into a stock, I wanted a quick way to tell whether the company
+behind it was actually any good. So I picked four things analysts look at, set a cutoff for
+each, and made the app explain every grade in plain English. The app opens on my watchlist,
+which is the mix of stocks and index funds I actually follow.
+
 ## What's in it
 
 - **Report card:** an overall grade, a grade and comment for each subject, and every
@@ -22,6 +30,8 @@ try to predict prices.
   amount in the S&P 500.
 - **Drops from peak:** how far the stock fell below its high, day by day.
 - **Compare:** rank a list of tickers, with a risk vs. return chart.
+- **My watchlist:** Nvidia, Micron, Vistra, Oklo and three index funds, each with a note on
+  why it's there. The Methodology page explains why I picked each cutoff.
 - **Dark and light mode**, and links that keep your stock, page and time period.
 
 ## How the grading works
