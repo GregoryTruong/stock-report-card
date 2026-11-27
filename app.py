@@ -63,13 +63,33 @@ THEME = current_theme()
 ui.set_theme(THEME)
 st.html(ui.css())
 
+# Stocks I keep an eye on, picked from the things I'm into, with the reason for each.
+WATCHLIST = {
+    "ATZ.TO": "Fashion. Aritzia is a Canadian clothing brand.",
+    "SHOP.TO": "Tech. Shopify is a Canadian online store platform.",
+    "NVDA": "Tech and gaming. Nvidia makes GeForce graphics cards.",
+    "SONY": "Gaming. Sony makes the PlayStation.",
+    "RACE": "Cars. Ferrari.",
+    "NKE": "Sports and fashion. Nike.",
+}
+
 # Ready-made groups of tickers so people can explore without knowing symbols.
 PRESETS = {
+    "My watchlist": list(WATCHLIST),
     "Car makers": ["TSLA", "F", "GM", "TM", "RIVN", "HMC"],
     "Gaming": ["NVDA", "AMD", "SONY", "NTDOY", "TTWO", "RBLX"],
     "Big tech": ["AAPL", "MSFT", "GOOGL", "AMZN", "META"],
     "Everyday brands": ["KO", "PEP", "PG", "WMT", "MCD", "NKE"],
 }
+WHY_I_BUILT_THIS = """
+I wanted to open a TFSA and stop leaving my money in a savings account where it barely
+grew. Before putting money into a stock, I wanted a quick way to tell whether the company
+behind it was actually any good. So I picked four things analysts look at, set a cutoff
+for each, and made the app explain every grade in plain English.
+
+The watchlist is made of companies from things I'm into: tech, cars, sports, fashion
+and gaming.
+"""
 PERIODS = {"1Y": "1y", "3Y": "3y", "5Y": "5y", "10Y": "10y"}
 PAGES = ["Report card", "Compare", "Methodology", "Terms & privacy"]
 
@@ -77,7 +97,7 @@ PAGES = ["Report card", "Compare", "Methodology", "Terms & privacy"]
 # so links can be shared and switching themes doesn't lose your place.
 params = st.query_params
 if "query" not in st.session_state:
-    st.session_state.query = params.get("q", "AAPL")
+    st.session_state.query = params.get("q", "ATZ.TO")
 if "page" not in st.session_state:
     st.session_state.page = params.get("page") if params.get("page") in PAGES else "Report card"
 if "period_label" not in st.session_state:
@@ -188,6 +208,9 @@ def report_card_page():
     st.html(ui.header_html(info.get("longName") or ticker, ticker, subtitle,
                            prices.iloc[-1], day_change, currency))
 
+    if ticker in WATCHLIST:
+        st.caption(f"On my watchlist: {WATCHLIST[ticker]}")
+
     excess = metrics["annual_return"] - metrics["market_annual_return"]
     cap_label = "Market cap" if currency == "USD" else f"Market cap ({currency})"
     st.html(ui.stats_html([
@@ -229,7 +252,7 @@ def report_card_page():
 # ------------------------------------------------------------------ Compare
 def compare_page():
     if "compare_input" not in st.session_state:
-        st.session_state.compare_input = ", ".join(PRESETS["Car makers"])
+        st.session_state.compare_input = ", ".join(PRESETS["My watchlist"])
 
     st.header("Compare stocks")
     st.text_input("Tickers, separated by commas", key="compare_input",
@@ -286,6 +309,8 @@ def compare_page():
 
 # -------------------------------------------------------------- Methodology
 def methodology_page():
+    st.header("Why I built this")
+    st.markdown(WHY_I_BUILT_THIS)
     st.header("How the grading works")
     st.markdown(
         """
@@ -315,6 +340,23 @@ well it uses shareholders' money (return on equity).
 
 **Risk:** volatility (daily swings), worst drop from a peak, and beta (how much the
 stock moves when the S&P 500 moves).
+
+**Why these cutoffs.** Each one is my own call, based on what's normal for a big
+US company:
+
+- **Profit margin, best at 25%.** The average S&P 500 company keeps roughly 11 to 13 cents
+  of each sales dollar as profit, so 25% is about double the norm. Zero or less scores 0.
+- **Revenue growth, best at 25% a year.** Most large companies grow in the single digits,
+  so 25% is fast. Shrinking scores 0.
+- **P/E, best at 12 and worst at 40.** The S&P 500 has averaged around 16 over the long
+  run. Under 12 is cheap; over 40 means investors are paying for a lot of growth that
+  hasn't happened yet. A company losing money gets the worst score.
+- **Volatility, best at 15% a year.** That's close to how much the S&P 500 itself swings
+  in a typical year. At 60%, the price can halve or double within a year.
+- **Funds get no overall grade.** An index fund like SPY has no sales or profit of its own,
+  so it would be graded on risk alone and beat every real company. I found that bug while
+  testing the Compare page, so now a stock needs Growth or Profitability data to get an
+  overall grade.
 
 **Limitations:** the cutoffs are general rules of thumb. Different industries have
 different "normal" numbers (software has higher margins than grocery stores),

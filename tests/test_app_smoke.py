@@ -164,3 +164,17 @@ def test_terms_and_privacy_page_loads():
     text = " ".join(m.value for m in at.markdown)
     assert "Nothing here is financial advice" in text
     assert "What the app collects" in text
+
+
+def test_opens_on_a_watchlist_stock_with_its_note():
+    at = run_app()
+    assert not at.exception
+    assert at.text_input(key="query").value == "ATZ.TO"
+    assert any("On my watchlist" in c.value for c in at.caption)
+
+
+def test_methodology_explains_why_i_built_it():
+    at = run_app(page="Methodology")
+    assert not at.exception
+    text = " ".join(m.value for m in at.markdown)
+    assert "TFSA" in text and "Why these cutoffs" in text
