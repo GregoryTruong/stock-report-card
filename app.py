@@ -247,7 +247,7 @@ def compare_page():
                 st.warning(f"Skipped {plain(t)}: {plain(error)}")
                 continue
             row = {"Ticker": t, "Company": info.get("shortName") or t,
-                   "Overall": card["overall_grade"], "Score": card["overall_score"] or 0}
+                   "Overall": card["overall_grade"], "Score": card["overall_score"]}
             row.update({name: c["grade"] for name, c in card["categories"].items()})
             row.update({f"{name} score": c["score"] for name, c in card["categories"].items()})
             row["Yearly return"] = metrics["annual_return"]
@@ -257,7 +257,7 @@ def compare_page():
     if not rows:
         return
     table = pd.DataFrame(rows)
-    ranked = table[table["Ticker"] != MARKET_TICKER].sort_values("Score", ascending=False)
+    ranked = table[table["Ticker"] != MARKET_TICKER].sort_values("Score", ascending=False, na_position="last")
 
     grade_columns = ["Overall", *CATEGORIES]
     st.html(ui.top_three_html(ranked))
@@ -338,13 +338,15 @@ the open-source yfinance library. That data can be late, missing or wrong, and t
 are only as good as the data behind them. Yahoo's data is meant for personal use, so please
 don't scrape this site or resell what it shows.
 
-**What we collect.** Nothing that identifies you. There are no accounts, no sign-ups, no ads
-and no analytics on this app. What you type in the search box is sent to Yahoo Finance to
+**What the app collects.** Nothing that identifies you. There are no accounts, no sign-ups
+and no ads, and the app doesn't add any tracking or analytics of its own (Streamlit's usage
+stats are switched off). What you type in the search box is sent to Yahoo Finance to
 look up the stock, and it shows up in the page address so links can be shared. Your
 dark or light mode choice is saved in your own browser.
 
-**Hosting.** The app runs on Streamlit Community Cloud, which keeps its own server logs under
-its own privacy policy.
+**Hosting.** The app runs on Streamlit Community Cloud. Streamlit keeps its own server logs,
+and if you're signed in to Streamlit it may show the app owner that you viewed the app. That
+part is covered by Streamlit's privacy policy, not this page.
 
 **Questions or problems.** Open an issue on the
 [GitHub repository](https://github.com/GregoryTruong/stock-report-card/issues).

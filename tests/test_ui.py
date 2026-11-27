@@ -10,9 +10,25 @@ def test_rgba_converts_hex():
     assert _rgba("#34D399", 0.5) == "rgba(52, 211, 153, 0.5)"
 
 
-def test_grade_chip_uses_grade_color():
-    assert THEMES["dark"]["GRADE_COLORS"]["A"] in grade_chip("A")
-    assert THEMES["dark"]["GRADE_COLORS"]["N/A"] in grade_chip("something odd")  # unknown grades fall back to gray
+def test_grade_chip_uses_the_current_themes_grade_color():
+    from src import ui
+
+    for mode in ("dark", "light"):
+        ui.set_theme(mode)
+        try:
+            assert THEMES[mode]["GRADE_COLORS"]["A"] in grade_chip("A")
+            assert THEMES[mode]["GRADE_COLORS"]["N/A"] in grade_chip("something odd")
+        finally:
+            ui.set_theme("dark")
+
+
+def test_class_rank_skips_stocks_without_an_overall_grade():
+    ranked = pd.DataFrame([
+        {"Ticker": "AAA", "Company": "Alpha", "Overall": "A", "Score": 90.0},
+        {"Ticker": "FUND", "Company": "Fund", "Overall": "N/A", "Score": None},
+    ])
+    page = top_three_html(ranked)
+    assert "AAA" in page and "FUND" not in page and "nan" not in page  # unknown grades fall back to gray
 
 
 def test_scorecard_shows_verdict_and_every_category():

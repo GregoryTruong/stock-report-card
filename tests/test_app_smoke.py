@@ -115,7 +115,9 @@ def test_compare_page_ranks_stocks_and_skips_bad_ones():
     assert "GONE" in skipped and "NOPE" in skipped
     table = at.dataframe[0].value
     assert set(table["Ticker"]) == {"AAPL", "LOSS", "SPYX", "ATZ.TO"}
-    assert list(table["Score"]) == sorted(table["Score"], reverse=True)  # best first
+    graded = list(table["Score"].dropna())
+    assert graded == sorted(graded, reverse=True)  # best first
+    assert table["Score"].isna().sum() == 1 and pd.isna(table["Score"].iloc[-1])  # the fund: no score, last
     assert "SPY" not in list(table["Ticker"])  # the market benchmark isn't ranked
 
 
@@ -160,5 +162,5 @@ def test_terms_and_privacy_page_loads():
     at = run_app(page="Terms & privacy")
     assert not at.exception
     text = " ".join(m.value for m in at.markdown)
-    assert "not financial advice" in text.lower() or "nothing here is financial advice" in text.lower()
-    assert "What we collect" in text
+    assert "Nothing here is financial advice" in text
+    assert "What the app collects" in text

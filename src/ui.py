@@ -138,7 +138,8 @@ table.rc-subjects td.comment {{ color: {T.MUTED}; font-size: .92rem; }}
 .rc-score .bar span {{ display: block; height: 100%; }}
 .rc-score b {{ font-family: {MONO}; font-weight: 500; width: 2.2em; text-align: right; }}
 
-.rc-chip {{ display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+.rc-chip {{ display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 32px;
+  padding: 0 5px; box-sizing: border-box; white-space: nowrap;
   border-radius: 3px; font-family: {SERIF}; font-weight: 700; font-size: 1.1rem; border: 1px solid; }}
 
 /* Compare: class rank */
@@ -190,18 +191,16 @@ table.rc-table td {{ padding: 10px 12px; border-bottom: 1px solid {T.TRACK}; col
 
 def grade_chip(grade: str) -> str:
     color = grade_color(grade)
-    return (f'<span class="rc-chip" style="color:{color};border-color:{_rgba(color, .55)};'
+    size = "font-size:.8rem;" if len(str(grade)) > 1 else ""  # "N/A" needs to fit the box
+    return (f'<span class="rc-chip" style="{size}color:{color};border-color:{_rgba(color, .55)};'
             f'background:{_rgba(color, .08)}">{html.escape(str(grade))}</span>')
 
 
 def hero_html() -> str:
     return """
     <div class="rc-hero">
-      <div class="rc-label">Stock Report Card</div>
       <h1>A report card for any stock.</h1>
-      <p>Four subjects: growth, profitability, valuation and risk. Each gets a letter grade from
-         plain cutoffs, and the risk numbers are measured against the S&amp;P 500. Search a company
-         by name or ticker, or pick one below.</p>
+      <p>Graded A to F in growth, profitability, valuation and risk.</p>
     </div>"""
 
 
@@ -297,7 +296,7 @@ def skeleton_html() -> str:
 
 def top_three_html(ranked: pd.DataFrame) -> str:
     """The top three stocks as a short class ranking."""
-    top = ranked.head(3).to_dict("records")
+    top = ranked[ranked["Score"].notna()].head(3).to_dict("records")
     if not top:
         return ""
     rows = "".join(f"""
@@ -396,7 +395,7 @@ def risk_return_chart(table: pd.DataFrame) -> go.Figure:
     stocks, market = table[~is_market], table[is_market]
     fig = go.Figure()
     fig.add_scatter(
-        x=stocks["Volatility"], y=stocks["Yearly return"], mode="markers+text",
+        x=stocks["Volatility"], y=stocks["Yearly return"], mode="markers+text", cliponaxis=False,
         text=stocks["Ticker"], textposition="top center", textfont={"family": "IBM Plex Mono", "color": T.TEXT},
         marker={"size": 13, "color": [grade_color(g) for g in stocks["Overall"]],
                 "line": {"width": 1, "color": T.PANEL}},
@@ -441,8 +440,9 @@ def radar_chart(table: pd.DataFrame, categories) -> go.Figure:
                "radialaxis": {"range": [0, 100], "gridcolor": T.GRID,
                               "showticklabels": False, "linecolor": "rgba(0,0,0,0)"},
                "angularaxis": {"gridcolor": T.GRID, "linecolor": T.BORDER,
-                               "tickfont": {"color": T.TEXT, "family": "Source Serif 4", "size": 14}}},
+                               "tickfont": {"color": T.TEXT, "family": "Source Serif 4", "size": 12}}},
     )
     fig = _style(fig, height=460)
-    fig.update_layout(hovermode="closest", legend={"y": -0.08, "orientation": "h"})
+    fig.update_layout(hovermode="closest", legend={"y": -0.08, "orientation": "h"},
+                      margin={"l": 70, "r": 70, "t": 40, "b": 40})  # room for the axis labels on phones
     return fig

@@ -34,3 +34,8 @@ backgroundColor = "#ECE8DE"
 
 [client]
 toolbarMode = "minimal"
+
+# Streamlit sends anonymous usage stats by default. Turn that off so the
+# Terms & privacy page can honestly say the app has no analytics.
+[browser]
+gatherUsageStats = false
