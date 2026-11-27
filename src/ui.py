@@ -1,40 +1,41 @@
-"""Visual building blocks: the dark theme, report card widgets and chart styling."""
+"""Visual building blocks: the two themes, the report card widgets and chart styling.
+
+The look is a printed school report card: warm paper (or graphite at night), ink
+text, a serif for headings, thin rules instead of shadows, and square corners.
+Color is only used where it means something: the grade, the stock and the market.
+"""
 
 import html
 import threading
-from urllib.parse import quote
 
 import pandas as pd
 import plotly.graph_objects as go
 
-# Two color palettes, one per theme. Colors carry meaning in both: green = good
-# grade, red = bad grade, blue = the stock, gray = the market. Each grade has a
-# strong color for text and rings, and a see-through version for chip backgrounds.
+# Two palettes, one per theme. Grades run from green (A) to brick red (F), muted so
+# the page reads like ink on paper rather than a neon dashboard.
 THEMES = {
     "dark": {
-        "GRADE_COLORS": {"A": "#34D399", "B": "#A3E635", "C": "#FBBF24", "D": "#FB923C",
-                         "F": "#F87171", "N/A": "#94A3B8"},
-        "STOCK_COLOR": "#60A5FA", "MARKET_COLOR": "#64748B",
-        "GAIN_COLOR": "#34D399", "LOSS_COLOR": "#F87171",
-        "TEXT": "#E6EAF2", "MUTED": "#8B95A7",
-        "BG": "#0B0F17", "PANEL": "#131A26", "SIDEBAR": "rgba(11, 15, 23, .85)",
-        "CARD": "rgba(19, 26, 38, 0.72)", "BORDER": "rgba(148, 163, 184, 0.14)",
-        "TRACK": "rgba(255, 255, 255, .07)", "GRID": "rgba(148, 163, 184, 0.10)",
-        "GLOW": 0.18,
+        "GRADE_COLORS": {"A": "#86B98F", "B": "#AFC285", "C": "#D8B56A", "D": "#DB9970",
+                         "F": "#E0887E", "N/A": "#8E9196"},
+        "STOCK_COLOR": "#8FB3D9", "MARKET_COLOR": "#7D8187",
+        "GAIN_COLOR": "#86B98F", "LOSS_COLOR": "#E0887E",
+        "TEXT": "#E9E5DB", "MUTED": "#9C988F",
+        "BG": "#17191C", "PANEL": "#1E2125", "SIDEBAR": "#1B1D20",
+        "BORDER": "#353940", "TRACK": "#2B2F34", "GRID": "#2B2F34",
+        "SERIES": ["#8FB3D9", "#E0887E", "#AFC285", "#D8B56A", "#B9B4A9", "#7FB7B3", "#C9A27E", "#9EA3C0"],
     },
     "light": {
-        "GRADE_COLORS": {"A": "#059669", "B": "#65A30D", "C": "#D97706", "D": "#EA580C",
-                         "F": "#DC2626", "N/A": "#64748B"},
-        "STOCK_COLOR": "#2563EB", "MARKET_COLOR": "#94A3B8",
-        "GAIN_COLOR": "#059669", "LOSS_COLOR": "#DC2626",
-        "TEXT": "#0F172A", "MUTED": "#5B6474",
-        "BG": "#F5F7FB", "PANEL": "#FFFFFF", "SIDEBAR": "rgba(255, 255, 255, .8)",
-        "CARD": "rgba(255, 255, 255, 0.85)", "BORDER": "rgba(15, 23, 42, 0.10)",
-        "TRACK": "rgba(15, 23, 42, .08)", "GRID": "rgba(15, 23, 42, 0.07)",
-        "GLOW": 0.12,
+        "GRADE_COLORS": {"A": "#2E6B3F", "B": "#58743A", "C": "#94701E", "D": "#A55A2C",
+                         "F": "#A3332B", "N/A": "#73757A"},
+        "STOCK_COLOR": "#1F4E79", "MARKET_COLOR": "#8C8F94",
+        "GAIN_COLOR": "#2E6B3F", "LOSS_COLOR": "#A3332B",
+        "TEXT": "#1C1E21", "MUTED": "#5F6166",
+        "BG": "#F3F0E8", "PANEL": "#FAF8F3", "SIDEBAR": "#ECE8DE",
+        "BORDER": "#D3CCBE", "TRACK": "#E4DED2", "GRID": "#E2DCD0",
+        "SERIES": ["#1F4E79", "#A3332B", "#58743A", "#94701E", "#4B5563", "#2F6F73", "#7A4E2D", "#5A5F86"],
     },
 }
-# One short verdict per overall grade, shown under the big grade ring.
+# One short verdict per overall grade, like the line a teacher writes at the bottom.
 VERDICTS = {
     "A": "Top of the class",
     "B": "Strong all-rounder",
@@ -43,46 +44,6 @@ VERDICTS = {
     "F": "Struggling",
     "N/A": "Not enough data",
 }
-
-# Line icons from Lucide (https://lucide.dev, ISC license): the inner SVG of each
-# 24x24 icon. Streamlit strips inline <svg>, so icon() draws them as a CSS mask
-# filled with the current text color.
-ICONS = {
-    "trending-up": '<path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/>',
-    "dollar": ('<circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/>'
-               '<path d="M12 18V6"/>'),
-    "scale": ('<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/>'
-              '<path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/>'
-              '<path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>'),
-    "shield": ('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1'
-               'c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>'),
-    "trophy": ('<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>'
-               '<path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>'
-               '<path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>'
-               '<path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>'),
-    "arrow-up": '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
-    "arrow-down": '<path d="m7 7 10 10"/><path d="M17 7v10H7"/>',
-}
-CATEGORY_ICONS = {"Growth": "trending-up", "Profitability": "dollar", "Valuation": "scale", "Risk": "shield"}
-
-
-def _icon_css() -> str:
-    """One CSS class per icon (rc-i-<name>) that draws it as a mask filled with the text color.
-
-    Streamlit strips inline <svg> and inline mask styles, so the icons live in the stylesheet.
-    """
-    rules = []
-    for name, body in ICONS.items():
-        svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" '
-               f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{body}</svg>')
-        mask = f'url("data:image/svg+xml,{quote(svg)}") center / contain no-repeat'
-        rules.append(f".rc-i-{name} {{ -webkit-mask: {mask}; mask: {mask}; }}")
-    return "\n".join(rules)
-
-
-def icon(name: str, size: int = 18) -> str:
-    """An inline line icon that takes the color of the text around it."""
-    return f'<span class="rc-icon rc-i-{name}" style="width:{size}px;height:{size}px"></span>'
 
 
 class _Palette(threading.local):
@@ -105,8 +66,10 @@ def set_theme(mode: str) -> None:
     T.__dict__.update(THEMES.get(mode, THEMES["dark"]))
 
 
-MONO = "'JetBrains Mono', 'IBM Plex Mono', monospace"
-DISPLAY = "'Space Grotesk', 'IBM Plex Sans', sans-serif"
+SERIF = "'Source Serif 4', Georgia, serif"
+MONO = "'IBM Plex Mono', ui-monospace, monospace"
+FONTS_URL = ("https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700"
+             "&family=IBM+Plex+Mono:wght@400;500&display=swap")
 
 
 def _rgba(hex_color: str, alpha: float) -> str:
@@ -119,119 +82,74 @@ def grade_color(grade: str) -> str:
     return T.GRADE_COLORS.get(grade, T.GRADE_COLORS["N/A"])
 
 
-FONTS_URL = ("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700"
-             "&family=JetBrains+Mono:wght@400;600&display=swap")
-
 def css() -> str:
     """The page stylesheet, built from the current theme's colors."""
     return f"""
 <style>
 @import url("{FONTS_URL}");
-/* Soft blue glow behind the whole app, like city lights at night. */
-.stApp {{
-  background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(59, 130, 246, {T.GLOW}), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(14, 165, 233, {T.GLOW / 2}), transparent 60%),
-    {T.BG};
-}}
+.stApp {{ background: {T.BG}; }}
 [data-testid="stHeader"] {{ background: transparent; }}
-h1, h2, h3 {{ font-family: {DISPLAY} !important; letter-spacing: -0.02em; }}
+h1, h2, h3 {{ font-family: {SERIF} !important; font-weight: 700 !important; letter-spacing: -0.01em; }}
 
-@keyframes rc-rise {{ from {{ opacity: 0; transform: translateY(14px); }} to {{ opacity: 1; transform: none; }} }}
-@keyframes rc-grow {{ from {{ width: 0; }} }}
-@keyframes rc-ring {{ from {{ opacity: 0; transform: rotate(-120deg) scale(.85); }} }}
-@keyframes rc-pulse {{ 0%, 100% {{ opacity: .55; }} 50% {{ opacity: 1; }} }}
+.rc-panel {{ background: {T.PANEL}; border: 1px solid {T.BORDER}; border-radius: 4px; }}
+.rc-label {{ font-size: .74rem; color: {T.MUTED}; text-transform: uppercase; letter-spacing: .09em; }}
+.rc-num {{ font-family: {MONO}; font-variant-numeric: tabular-nums; }}
 
-.rc-rise {{ animation: rc-rise .6s cubic-bezier(.2, .7, .2, 1) both; }}
-
-/* Hero */
-.rc-hero {{ padding: 8px 0 20px; }}
-.rc-eyebrow {{ display: inline-flex; align-items: center; gap: 8px; font-family: {MONO};
-  font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: {T.STOCK_COLOR};
-  padding: 5px 12px; border: 1px solid {_rgba(T.STOCK_COLOR, .35)}; border-radius: 999px;
-  background: {_rgba(T.STOCK_COLOR, .08)}; }}
-.rc-eyebrow .dot {{ width: 6px; height: 6px; border-radius: 50%; background: {T.STOCK_COLOR};
-  box-shadow: 0 0 10px {T.STOCK_COLOR}; animation: rc-pulse 2s infinite; }}
-.rc-hero h1 {{ font-size: clamp(2rem, 4.5vw, 3.2rem); line-height: 1.05; margin: 14px 0 8px;
-  padding: 0; font-weight: 700; color: {T.TEXT}; }}
-.rc-hero h1 span {{ background: linear-gradient(90deg, #60A5FA, #22D3EE 60%, #A5F3FC);
-  -webkit-background-clip: text; background-clip: text; color: transparent; }}
-.rc-hero p {{ color: {T.MUTED}; font-size: 1.02rem; max-width: 620px; margin: 0; }}
-
-/* Cards */
-.rc-card {{ background: {T.CARD}; border: 1px solid {T.BORDER}; border-radius: 16px;
-  padding: 20px; backdrop-filter: blur(8px); }}
+/* Masthead */
+.rc-hero {{ padding: 4px 0 18px; border-bottom: 1px solid {T.BORDER}; margin-bottom: 18px; }}
+.rc-hero h1 {{ font-size: clamp(1.9rem, 4vw, 2.7rem); line-height: 1.1; margin: 6px 0 10px; padding: 0;
+  color: {T.TEXT}; }}
+.rc-hero p {{ color: {T.MUTED}; font-size: 1.02rem; max-width: 640px; margin: 0; line-height: 1.55; }}
 
 /* Company header */
-.rc-header {{ display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
-  gap: 16px; margin: 8px 0 16px; }}
-.rc-name {{ font-family: {DISPLAY}; font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700;
-  line-height: 1.1; color: {T.TEXT}; }}
-.rc-tags {{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }}
-.rc-tag {{ font-size: .78rem; color: {T.MUTED}; padding: 3px 10px; border-radius: 999px;
-  border: 1px solid {T.BORDER}; background: {T.TRACK}; }}
-.rc-tag.ticker {{ font-family: {MONO}; color: {T.STOCK_COLOR}; border-color: {_rgba(T.STOCK_COLOR, .4)}; }}
-.rc-price {{ font-family: {MONO}; font-size: clamp(1.6rem, 3vw, 2.1rem); font-weight: 600;
+.rc-header {{ display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap;
+  gap: 12px 24px; margin: 10px 0 14px; padding-bottom: 14px; border-bottom: 1px solid {T.BORDER}; }}
+.rc-name {{ font-family: {SERIF}; font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700;
+  line-height: 1.15; color: {T.TEXT}; }}
+.rc-sub {{ margin-top: 6px; font-size: .9rem; color: {T.MUTED}; }}
+.rc-sub .tk {{ font-family: {MONO}; color: {T.TEXT}; font-weight: 500; margin-right: 10px; }}
+.rc-price {{ font-family: {MONO}; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 500;
   text-align: right; color: {T.TEXT}; }}
-.rc-change {{ display: inline-flex; align-items: center; gap: 4px; font-family: {MONO}; font-size: .85rem;
-  font-weight: 600;
-  padding: 3px 10px; border-radius: 999px; float: right; margin-top: 4px; }}
+.rc-change {{ font-family: {MONO}; font-size: .88rem; text-align: right; margin-top: 2px; }}
 
-/* Stat tiles */
-.rc-stats {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 8px; }}
-.rc-stat {{ padding: 16px 18px; }}
-.rc-stat .k {{ font-size: .75rem; color: {T.MUTED}; text-transform: uppercase; letter-spacing: .08em; }}
-.rc-stat .v {{ font-family: {MONO}; font-size: 1.45rem; font-weight: 600; color: {T.TEXT}; margin-top: 6px; }}
-.rc-stat .d {{ font-family: {MONO}; font-size: .78rem; margin-top: 4px; }}
+/* Key numbers: one strip split by thin rules */
+.rc-stats {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 18px; }}
+.rc-stat {{ padding: 14px 16px; border-left: 1px solid {T.BORDER}; }}
+.rc-stat:first-child {{ border-left: 0; }}
+.rc-stat .v {{ font-family: {MONO}; font-size: 1.35rem; font-weight: 500; color: {T.TEXT}; margin-top: 6px; }}
+.rc-stat .d {{ font-family: {MONO}; font-size: .78rem; margin-top: 3px; }}
 
-/* Report card: ring + category cards */
-.rc-report {{ display: grid; grid-template-columns: 260px 1fr; gap: 16px; margin: 4px 0 8px; }}
-.rc-overall {{ display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; gap: 6px; }}
-.rc-ring {{ position: relative; width: 150px; height: 150px; }}
-.rc-ring .arc {{ position: absolute; inset: 0; border-radius: 50%;
-  background: conic-gradient(var(--c) calc(var(--p) * 1%), {T.TRACK} 0);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 11px), #000 calc(100% - 10px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 11px), #000 calc(100% - 10px));
-  filter: drop-shadow(0 0 6px var(--c)); animation: rc-ring 1.2s cubic-bezier(.2, .7, .2, 1) both; }}
-.rc-ring .letter {{ position: absolute; inset: 0; display: grid; place-items: center;
-  font-family: {DISPLAY}; font-size: 3.6rem; font-weight: 700; }}
-.rc-overall .verdict {{ font-family: {DISPLAY}; font-size: 1.15rem; font-weight: 600; color: {T.TEXT}; }}
-.rc-overall .score {{ font-family: {MONO}; font-size: .85rem; color: {T.MUTED}; }}
-.rc-cats {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }}
-.rc-cat {{ position: relative; overflow: hidden; transition: transform .2s, border-color .2s; }}
-.rc-cat:hover {{ transform: translateY(-2px); border-color: {T.MUTED}; }}
-.rc-cat::before {{ content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--c); }}
-.rc-cat .top {{ display: flex; justify-content: space-between; align-items: center; }}
-.rc-cat .name {{ font-family: {DISPLAY}; font-size: 1.05rem; font-weight: 600; color: {T.TEXT}; }}
-.rc-icon {{ display: inline-block; flex: none; background: currentColor; vertical-align: -0.15em; }}
-{_icon_css()}
-.rc-cat .name {{ display: flex; align-items: center; gap: 10px; }}
-.rc-cat .glyph {{ display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 9px;
-  color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }}
-.rc-cat .bar {{ height: 6px; border-radius: 3px; background: {T.TRACK};
-  margin: 14px 0 10px; overflow: hidden; }}
-.rc-cat .bar span {{ display: block; height: 100%; border-radius: 3px;
-  background: linear-gradient(90deg, {T.TRACK}, var(--c));
-  box-shadow: 0 0 12px var(--c); animation: rc-grow 1s cubic-bezier(.2, .7, .2, 1) both; }}
-.rc-cat .meta {{ display: flex; justify-content: space-between; font-size: .88rem; color: {T.MUTED}; gap: 12px; }}
-.rc-cat .meta b {{ font-family: {MONO}; color: {T.TEXT}; font-weight: 600; white-space: nowrap; }}
+/* The report card itself */
+.rc-sheet {{ display: grid; grid-template-columns: 220px 1fr; margin: 0 0 14px; }}
+.rc-overall {{ padding: 22px 20px; border-right: 1px solid {T.BORDER}; text-align: center; }}
+.rc-overall .big {{ font-family: {SERIF}; font-size: 4.6rem; font-weight: 700; line-height: 1; margin: 10px 0 8px; }}
+.rc-overall .verdict {{ font-family: {SERIF}; font-size: 1.1rem; font-weight: 600; color: {T.TEXT}; }}
+.rc-overall .score {{ font-family: {MONO}; font-size: .85rem; color: {T.MUTED}; margin-top: 4px; }}
+table.rc-subjects {{ width: 100%; border-collapse: collapse; }}
+table.rc-subjects th {{ text-align: left; font-weight: 500; padding: 12px 16px 8px;
+  border-bottom: 1px solid {T.BORDER}; }}
+table.rc-subjects td {{ padding: 13px 16px; border-bottom: 1px solid {T.TRACK}; color: {T.TEXT};
+  vertical-align: middle; }}
+table.rc-subjects tr:last-child td {{ border-bottom: 0; }}
+table.rc-subjects td.subject {{ font-family: {SERIF}; font-weight: 600; font-size: 1.05rem; white-space: nowrap; }}
+table.rc-subjects td.comment {{ color: {T.MUTED}; font-size: .92rem; }}
+.rc-score {{ display: flex; align-items: center; gap: 10px; min-width: 120px; }}
+.rc-score .bar {{ flex: 1; height: 4px; background: {T.TRACK}; }}
+.rc-score .bar span {{ display: block; height: 100%; }}
+.rc-score b {{ font-family: {MONO}; font-weight: 500; width: 2.2em; text-align: right; }}
 
-.rc-chip {{ display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px;
-  border-radius: 10px; font-family: {DISPLAY}; font-weight: 700; font-size: 1.1rem; }}
+.rc-chip {{ display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  border-radius: 3px; font-family: {SERIF}; font-weight: 700; font-size: 1.1rem; border: 1px solid; }}
 
-/* Compare podium */
-.rc-podium {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;
-  align-items: end; margin: 8px 0 20px; }}
-.rc-place {{ text-align: center; }}
-.rc-place .rank {{ display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
-  font-family: {DISPLAY}; font-weight: 700; font-size: 1.05rem; color: var(--m);
-  border: 1.5px solid var(--m); background: color-mix(in srgb, var(--m) 12%, transparent); }}
-.rc-place .tk {{ font-family: {MONO}; font-size: 1.3rem; font-weight: 600; color: {T.TEXT}; margin-top: 4px; }}
-.rc-place .co {{ font-size: .82rem; color: {T.MUTED}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
-.rc-place .sc {{ font-family: {MONO}; font-size: .85rem; color: {T.MUTED}; margin-top: 8px; }}
-.rc-place.first {{ padding-top: 32px; padding-bottom: 32px; border-color: rgba(251, 191, 36, .45);
-  box-shadow: 0 0 40px rgba(251, 191, 36, .08); }}
+/* Compare: class rank */
+.rc-rank {{ margin: 6px 0 18px; }}
+.rc-rank .row {{ display: grid; grid-template-columns: 34px 90px 1fr auto 96px; align-items: center; gap: 12px;
+  padding: 12px 16px; border-top: 1px solid {T.TRACK}; }}
+.rc-rank .row:first-child {{ border-top: 0; }}
+.rc-rank .pos {{ font-family: {SERIF}; font-weight: 700; font-size: 1.2rem; color: {T.MUTED}; }}
+.rc-rank .tk {{ font-family: {MONO}; font-weight: 500; color: {T.TEXT}; }}
+.rc-rank .co {{ color: {T.MUTED}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+.rc-rank .sc {{ font-family: {MONO}; color: {T.MUTED}; text-align: right; white-space: nowrap; }}
 
 /* Plain tables (methodology) */
 table.rc-table {{ width: 100%; border-collapse: collapse; }}
@@ -239,23 +157,32 @@ table.rc-table th {{ text-align: left; color: {T.MUTED}; font-weight: 500; font-
   padding: 8px 12px; border-bottom: 1px solid {T.BORDER}; }}
 table.rc-table td {{ padding: 10px 12px; border-bottom: 1px solid {T.TRACK}; color: {T.TEXT}; }}
 
+/* Loading placeholder, shaped like the page that is about to appear */
+.rc-skel {{ background: {T.TRACK}; border-radius: 2px; animation: rc-wait 1.4s ease-in-out infinite; }}
+@keyframes rc-wait {{ 50% {{ opacity: .45; }} }}
+
 /* Streamlit widgets, tuned to the theme */
+[data-testid="stButtonGroup"] button {{ border-radius: 4px !important; }}
 [data-testid="stSidebar"] {{ background: {T.SIDEBAR}; border-right: 1px solid {T.BORDER}; }}
-[data-testid="stTabs"] button p {{ font-family: {DISPLAY}; font-weight: 600; }}
-[data-testid="stExpander"] details {{ background: {T.CARD}; border-radius: 14px; border-color: {T.BORDER}; }}
-[data-testid="stPlotlyChart"] {{ background: {T.CARD}; border: 1px solid {T.BORDER}; border-radius: 16px;
+[data-testid="stExpander"] details {{ background: {T.PANEL}; border-radius: 4px; border-color: {T.BORDER}; }}
+[data-testid="stPlotlyChart"] {{ background: {T.PANEL}; border: 1px solid {T.BORDER}; border-radius: 4px;
   padding: 8px; }}
 
 @media (max-width: 900px) {{
-  .rc-report {{ grid-template-columns: 1fr; }}
   .rc-stats {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+  .rc-stat:nth-child(3) {{ border-left: 0; }}
+  .rc-stat:nth-child(n+3) {{ border-top: 1px solid {T.BORDER}; }}
 }}
-@media (max-width: 560px) {{
-  .rc-cats, .rc-podium {{ grid-template-columns: 1fr; }}
-  .rc-price, .rc-change {{ text-align: left; float: none; }}
+@media (max-width: 640px) {{
+  .rc-sheet {{ grid-template-columns: 1fr; }}
+  .rc-overall {{ border-right: 0; border-bottom: 1px solid {T.BORDER}; }}
+  table.rc-subjects th.comment, table.rc-subjects td.comment {{ display: none; }}
+  .rc-rank .row {{ grid-template-columns: 26px 70px 1fr auto; }}
+  .rc-rank .co {{ display: none; }}
+  .rc-price, .rc-change {{ text-align: left; }}
 }}
 @media (prefers-reduced-motion: reduce) {{
-  *, *::before {{ animation: none !important; transition: none !important; }}
+  .rc-skel {{ animation: none; }}
 }}
 </style>
 """
@@ -263,17 +190,18 @@ table.rc-table td {{ padding: 10px 12px; border-bottom: 1px solid {T.TRACK}; col
 
 def grade_chip(grade: str) -> str:
     color = grade_color(grade)
-    return (f'<span class="rc-chip" style="color:{color};background:{_rgba(color, .14)};'
-            f'border:1px solid {_rgba(color, .35)}">{grade}</span>')
+    return (f'<span class="rc-chip" style="color:{color};border-color:{_rgba(color, .55)};'
+            f'background:{_rgba(color, .08)}">{html.escape(str(grade))}</span>')
 
 
 def hero_html() -> str:
     return """
-    <div class="rc-hero rc-rise">
-      <span class="rc-eyebrow"><span class="dot"></span>Stock Report Card</span>
-      <h1>Grade any stock <span>in seconds.</span></h1>
-      <p>Growth, profitability, valuation and risk, scored A to F and measured against
-         the S&amp;P 500. Search a company or tap a pick below.</p>
+    <div class="rc-hero">
+      <div class="rc-label">Stock Report Card</div>
+      <h1>A report card for any stock.</h1>
+      <p>Four subjects: growth, profitability, valuation and risk. Each gets a letter grade from
+         plain cutoffs, and the risk numbers are measured against the S&amp;P 500. Search a company
+         by name or ticker, or pick one below.</p>
     </div>"""
 
 
@@ -284,97 +212,103 @@ def format_price(value, currency="USD") -> str:
 
 def header_html(name, ticker, subtitle, price, change, currency="USD") -> str:
     color = T.GAIN_COLOR if change >= 0 else T.LOSS_COLOR
-    arrow = icon("arrow-up" if change >= 0 else "arrow-down", 14)
-    tags = "".join(f'<span class="rc-tag">{html.escape(t)}</span>' for t in subtitle.split(" · ") if t)
+    sign = "+" if change >= 0 else "−"  # a real minus sign, not a hyphen
     return f"""
-    <div class="rc-header rc-rise">
+    <div class="rc-header">
       <div>
         <div class="rc-name">{html.escape(name)}</div>
-        <div class="rc-tags"><span class="rc-tag ticker">{html.escape(ticker)}</span>{tags}</div>
+        <div class="rc-sub"><span class="tk">{html.escape(ticker)}</span>{html.escape(subtitle)}</div>
       </div>
       <div>
         <div class="rc-price">{format_price(price, currency)}</div>
-        <span class="rc-change" style="color:{color};background:{_rgba(color, .12)}">
-          {arrow} {abs(change):.2%} today</span>
+        <div class="rc-change" style="color:{color}">{sign}{abs(change):.2%} today</div>
       </div>
     </div>"""
 
 
 def stats_html(stats) -> str:
-    """A row of stat tiles. Each stat is (label, value, delta text or None, delta is good)."""
-    tiles = ""
-    for i, (label, value, delta, good) in enumerate(stats):
+    """One strip of key numbers. Each stat is (label, value, note or None, note is good news)."""
+    cells = ""
+    for label, value, delta, good in stats:
         delta_html = ""
         if delta:
             color = T.GAIN_COLOR if good else T.LOSS_COLOR
             delta_html = f'<div class="d" style="color:{color}">{html.escape(delta)}</div>'
-        tiles += f"""
-        <div class="rc-card rc-stat rc-rise" style="animation-delay:{i * 60}ms">
-          <div class="k">{html.escape(label)}</div><div class="v">{html.escape(value)}</div>{delta_html}
+        cells += f"""
+        <div class="rc-stat">
+          <div class="rc-label">{html.escape(label)}</div><div class="v">{html.escape(value)}</div>{delta_html}
         </div>"""
-    return f'<div class="rc-stats">{tiles}</div>'
-
-
-def _ring(grade: str, score) -> str:
-    """A circular progress ring drawn with a CSS conic gradient (Streamlit strips inline SVG)."""
-    color = grade_color(grade)
-    return f"""
-    <div class="rc-ring" style="--c:{color};--p:{score or 0:.1f}">
-      <div class="arc"></div>
-      <div class="letter" style="color:{color};text-shadow:0 0 24px {_rgba(color, .45)}">{grade}</div>
-    </div>"""
+    return f'<div class="rc-panel rc-stats">{cells}</div>'
 
 
 def scorecard_html(card: dict) -> str:
-    """The overall grade ring plus one card per category."""
+    """The overall grade on the left, and one row per subject like a school report card."""
     overall = card["overall_score"]
     grade = card["overall_grade"]
-    overall_text = f"{overall:.0f} / 100" if overall is not None else "No data"
-    cats = ""
-    for i, (name, category) in enumerate(card["categories"].items()):
+    overall_text = f"{overall:.0f} / 100" if overall is not None else "No overall score"
+    rows = ""
+    for name, category in card["categories"].items():
         score = category["score"]
         color = grade_color(category["grade"])
         width = 0 if score is None else score
-        score_text = "-" if score is None else f"{score:.0f}/100"
-        cats += f"""
-        <div class="rc-card rc-cat rc-rise" style="--c:{color};animation-delay:{150 + i * 90}ms">
-          <div class="top">
-            <div class="name"><span class="glyph">{icon(CATEGORY_ICONS[name])}</span>{name}</div>
-            {grade_chip(category["grade"])}
-          </div>
-          <div class="bar"><span style="width:{width}%;animation-delay:{300 + i * 90}ms"></span></div>
-          <div class="meta"><span>{html.escape(category["summary"])}</span><b>{score_text}</b></div>
-        </div>"""
+        score_text = "-" if score is None else f"{score:.0f}"
+        rows += f"""
+        <tr>
+          <td class="subject">{name}</td>
+          <td>{grade_chip(category["grade"])}</td>
+          <td><div class="rc-score"><div class="bar"><span style="width:{width}%;background:{color}"></span></div>
+              <b>{score_text}</b></div></td>
+          <td class="comment">{html.escape(category["summary"])}</td>
+        </tr>"""
     return f"""
-    <div class="rc-report">
-      <div class="rc-card rc-overall rc-rise">
-        {_ring(grade, overall)}
+    <div class="rc-panel rc-sheet">
+      <div class="rc-overall">
+        <div class="rc-label">Overall</div>
+        <div class="big" style="color:{grade_color(grade)}">{grade}</div>
         <div class="verdict">{VERDICTS.get(grade, "")}</div>
-        <div class="score">Overall · {overall_text}</div>
+        <div class="score">{overall_text}</div>
       </div>
-      <div class="rc-cats">{cats}</div>
+      <table class="rc-subjects">
+        <tr><th class="rc-label">Subject</th><th class="rc-label">Grade</th><th class="rc-label">Score</th>
+            <th class="rc-label comment">Comment</th></tr>
+        {rows}
+      </table>
     </div>"""
 
 
-def podium_html(ranked: pd.DataFrame) -> str:
-    """The top three stocks, with first place in the middle like a real podium."""
+def skeleton_html() -> str:
+    """Gray blocks in the shape of a report card, shown while the data downloads."""
+    def block(width, height, extra=""):
+        return f'<div class="rc-skel" style="width:{width};height:{height}px;{extra}"></div>'
+
+    stats = "".join(f'<div class="rc-stat">{block("50%", 10)}{block("70%", 22, "margin-top:10px")}</div>'
+                    for _ in range(4))
+    rows = "".join(f'<div style="display:flex;gap:16px;padding:14px 16px">{block("22%", 16)}'
+                   f'{block("8%", 16)}{block("60%", 16)}</div>' for _ in range(4))
+    return f"""
+    <div aria-busy="true" aria-label="Loading">
+      <div class="rc-header"><div style="flex:1">{block("45%", 30)}{block("30%", 12, "margin-top:10px")}</div>
+        {block("120px", 30)}</div>
+      <div class="rc-panel rc-stats">{stats}</div>
+      <div class="rc-panel rc-sheet"><div class="rc-overall">{block("60%", 80, "margin:10px auto")}</div>
+        <div>{rows}</div></div>
+    </div>"""
+
+
+def top_three_html(ranked: pd.DataFrame) -> str:
+    """The top three stocks as a short class ranking."""
     top = ranked.head(3).to_dict("records")
     if not top:
         return ""
-    medals = ["#E3B341", "#A8B3C4", "#C98A5A"]  # gold, silver, bronze
-    places = [(row, medals[i], i) for i, row in enumerate(top)]
-    order = [places[i] for i in (1, 0, 2) if i < len(places)] if len(places) >= 2 else places
-    html_places = ""
-    for row, medal, rank in order:
-        html_places += f"""
-        <div class="rc-card rc-place rc-rise{' first' if rank == 0 else ''}" style="animation-delay:{rank * 120}ms">
-          <div class="rank" style="--m:{medal}">{icon("trophy", 20) if rank == 0 else rank + 1}</div>
+    rows = "".join(f"""
+        <div class="row">
+          <div class="pos">{rank}</div>
           <div class="tk">{html.escape(row["Ticker"])}</div>
           <div class="co">{html.escape(str(row["Company"]))}</div>
-          <div style="margin-top:10px">{grade_chip(row["Overall"])}</div>
+          <div>{grade_chip(row["Overall"])}</div>
           <div class="sc">{row["Score"]:.0f} / 100</div>
-        </div>"""
-    return f'<div class="rc-podium">{html_places}</div>'
+        </div>""" for rank, row in enumerate(top, start=1))
+    return f'<div class="rc-label">Class rank</div><div class="rc-panel rc-rank">{rows}</div>'
 
 
 def grade_table_html() -> str:
@@ -384,14 +318,14 @@ def grade_table_html() -> str:
         for g, s in (("A", "80 and up"), ("B", "65 to 79"), ("C", "50 to 64"),
                      ("D", "35 to 49"), ("F", "Under 35"))
     )
-    return (f'<div class="rc-card"><table class="rc-table"><tr><th>Grade</th><th>Score</th>'
+    return (f'<div class="rc-panel"><table class="rc-table"><tr><th>Grade</th><th>Score</th>'
             f'<th>Verdict</th></tr>{rows}</table></div>')
 
 
 def grade_cell_style(grade) -> str:
     """Used to color grade cells in the comparison table."""
     color = grade_color(grade)
-    return f"color: {color}; background-color: {_rgba(color, .14)}; font-weight: 700"
+    return f"color: {color}; font-weight: 600"
 
 
 def format_large_number(value, currency="USD") -> str:
@@ -422,22 +356,15 @@ def _style(fig: go.Figure, height: int = 360) -> go.Figure:
     return fig
 
 
-def _gradient(color: str, top_alpha: float) -> dict:
-    """A fill that fades from the line color down to transparent."""
-    return {"type": "vertical", "colorscale": [[0, _rgba(color, 0)], [1, _rgba(color, top_alpha)]]}
-
-
 def growth_chart(stock: pd.Series, market: pd.Series, ticker: str) -> go.Figure:
     fig = go.Figure()
     fig.add_scatter(x=market.index, y=market, name="S&P 500 (SPY)",
                     line={"color": T.MARKET_COLOR, "width": 1.5, "dash": "dot"})
-    fig.add_scatter(x=stock.index, y=stock, name=ticker, line={"color": T.STOCK_COLOR, "width": 2.5},
-                    fill="tozeroy", fillgradient=_gradient(T.STOCK_COLOR, 0.35))
-    # Mark where each line ends so the final values pop.
+    fig.add_scatter(x=stock.index, y=stock, name=ticker, line={"color": T.STOCK_COLOR, "width": 2})
+    # A small dot where each line ends, so the final values are easy to find.
     for series, color in ((market, T.MARKET_COLOR), (stock, T.STOCK_COLOR)):
         fig.add_scatter(x=[series.index[-1]], y=[series.iloc[-1]], mode="markers", showlegend=False,
-                        marker={"size": 9, "color": color, "line": {"width": 3, "color": _rgba(color, .3)}},
-                        hoverinfo="skip")
+                        marker={"size": 7, "color": color}, hoverinfo="skip")
     fig.add_hline(y=10_000, line={"color": T.MUTED, "width": 1, "dash": "dash"})
     fig.update_yaxes(tickprefix="$", tickformat=",.0f", rangemode="tozero")
     fig.update_traces(hovertemplate="$%{y:,.0f}", selector={"mode": "lines"})
@@ -448,12 +375,10 @@ def drawdown_chart(drawdown: pd.Series) -> go.Figure:
     fig = go.Figure()
     fig.add_scatter(x=drawdown.index, y=drawdown, name="Below peak", mode="lines",
                     line={"color": T.LOSS_COLOR, "width": 1.5}, fill="tozeroy",
-                    fillgradient={"type": "vertical",
-                                  "colorscale": [[0, _rgba(T.LOSS_COLOR, .4)], [1, _rgba(T.LOSS_COLOR, 0)]]},
-                    hovertemplate="%{y:.1%}")
+                    fillcolor=_rgba(T.LOSS_COLOR, .14), hovertemplate="%{y:.1%}")
     worst = drawdown.idxmin()
     fig.add_annotation(x=worst, y=drawdown.min(), text=f"Worst: {drawdown.min():.0%}", showarrow=True,
-                       arrowcolor=T.LOSS_COLOR, font={"color": T.LOSS_COLOR, "family": "JetBrains Mono"},
+                       arrowcolor=T.LOSS_COLOR, font={"color": T.LOSS_COLOR, "family": "IBM Plex Mono"},
                        ay=30, bgcolor=T.PANEL, bordercolor=_rgba(T.LOSS_COLOR, .4))
     fig.update_yaxes(tickformat=".0%")
     fig = _style(fig, height=300)
@@ -472,9 +397,9 @@ def risk_return_chart(table: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
     fig.add_scatter(
         x=stocks["Volatility"], y=stocks["Yearly return"], mode="markers+text",
-        text=stocks["Ticker"], textposition="top center", textfont={"family": "JetBrains Mono", "color": T.TEXT},
-        marker={"size": 18, "color": [grade_color(g) for g in stocks["Overall"]],
-                "line": {"width": 4, "color": [_rgba(grade_color(g), .25) for g in stocks["Overall"]]}},
+        text=stocks["Ticker"], textposition="top center", textfont={"family": "IBM Plex Mono", "color": T.TEXT},
+        marker={"size": 13, "color": [grade_color(g) for g in stocks["Overall"]],
+                "line": {"width": 1, "color": T.PANEL}},
         customdata=stocks["Overall"],
         hovertemplate="%{text} · grade %{customdata}<br>Return %{y:.1%}<br>Volatility %{x:.1%}<extra></extra>",
     )
@@ -500,7 +425,7 @@ def radar_chart(table: pd.DataFrame, categories) -> go.Figure:
     Stocks missing a category (common for funds) are left out, since a gap would
     look like a score of zero.
     """
-    palette = ["#60A5FA", "#F472B6", "#34D399", "#FBBF24", "#A78BFA", "#22D3EE", "#FB923C", "#F87171"]
+    palette = T.SERIES
     axes = [*categories, categories[0]]  # repeat the first point to close the shape
     fig = go.Figure()
     for i, row in enumerate(table.to_dict("records")):
@@ -509,14 +434,14 @@ def radar_chart(table: pd.DataFrame, categories) -> go.Figure:
         if any(score is None or score != score for score in scores):  # None or NaN
             continue
         fig.add_scatterpolar(r=scores, theta=axes, name=row["Ticker"], fill="toself",
-                             line={"color": color, "width": 2}, fillcolor=_rgba(color, .12),
+                             line={"color": color, "width": 2}, fillcolor=_rgba(color, .06),
                              hovertemplate="%{theta}: %{r:.0f}<extra>" + row["Ticker"] + "</extra>")
     fig.update_layout(
         polar={"bgcolor": "rgba(0,0,0,0)",
                "radialaxis": {"range": [0, 100], "gridcolor": T.GRID,
                               "showticklabels": False, "linecolor": "rgba(0,0,0,0)"},
                "angularaxis": {"gridcolor": T.GRID, "linecolor": T.BORDER,
-                               "tickfont": {"color": T.TEXT, "family": "Space Grotesk", "size": 14}}},
+                               "tickfont": {"color": T.TEXT, "family": "Source Serif 4", "size": 14}}},
     )
     fig = _style(fig, height=460)
     fig.update_layout(hovermode="closest", legend={"y": -0.08, "orientation": "h"})

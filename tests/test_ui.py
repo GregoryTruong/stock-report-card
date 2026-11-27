@@ -3,7 +3,7 @@
 import pandas as pd
 
 from src.grading import build_report_card
-from src.ui import _rgba, grade_chip, podium_html, radar_chart, scorecard_html
+from src.ui import THEMES, _rgba, grade_chip, radar_chart, scorecard_html, top_three_html
 
 
 def test_rgba_converts_hex():
@@ -11,8 +11,8 @@ def test_rgba_converts_hex():
 
 
 def test_grade_chip_uses_grade_color():
-    assert "#34D399" in grade_chip("A")
-    assert "#94A3B8" in grade_chip("something odd")  # unknown grades fall back to gray
+    assert THEMES["dark"]["GRADE_COLORS"]["A"] in grade_chip("A")
+    assert THEMES["dark"]["GRADE_COLORS"]["N/A"] in grade_chip("something odd")  # unknown grades fall back to gray
 
 
 def test_scorecard_shows_verdict_and_every_category():
@@ -33,9 +33,9 @@ def _ranked():
     ])
 
 
-def test_podium_puts_winner_in_the_middle_and_shows_top_three():
-    page = podium_html(_ranked())
-    assert page.index("BBB") < page.index("AAA") < page.index("CCC")
+def test_class_rank_lists_the_top_three_in_order():
+    page = top_three_html(_ranked())
+    assert page.index("AAA") < page.index("BBB") < page.index("CCC")
     assert "DDD" not in page
 
 
@@ -70,14 +70,17 @@ def test_light_theme_swaps_colors_only_for_this_thread():
         ui.set_theme("dark")
 
 
-def test_app_uses_line_icons_not_emoji():
+def test_no_emoji_icon_sets_or_decorative_effects():
+    """Guards the look G2 asked for: no emoji, no Lucide icons, no glows, gradients or glass."""
     import re
     from pathlib import Path
 
-    from src.ui import CATEGORY_ICONS, ICONS, icon
-
-    emoji = re.compile("[\U0001F000-\U0001FAFF☀-➿]")
-    for path in ("app.py", "src/ui.py"):
-        assert not emoji.search(Path(path).read_text(encoding="utf-8")), f"emoji found in {path}"
-    assert set(CATEGORY_ICONS.values()) <= set(ICONS)
-    assert 'class="rc-icon rc-i-shield"' in icon("shield")
+    emoji = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF]")
+    banned = ("lucide", ":material/", "box-shadow", "text-shadow", "drop-shadow", "linear-gradient",
+              "radial-gradient", "backdrop-filter", ":hover", "Space Grotesk", "Geist", "\u2014")
+    for path in ("app.py", "src/ui.py", ".streamlit/config.toml"):
+        text = Path(path).read_text(encoding="utf-8")
+        assert not emoji.search(text), f"emoji found in {path}"
+        for word in banned:
+            assert word not in text, f"{word!r} found in {path}"
+        assert not re.search(r"\bInter\b", text), f"the Inter font is used in {path}"
