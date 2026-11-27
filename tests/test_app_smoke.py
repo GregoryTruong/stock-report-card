@@ -154,3 +154,11 @@ def test_compare_page_ranks_a_fund_below_real_companies():
     at = run_app(page="Compare")
     at.text_input(key="compare_input").set_value("SPYX, AAPL").run()
     assert list(at.dataframe[0].value["Ticker"]) == ["AAPL", "SPYX"]
+
+
+def test_terms_and_privacy_page_loads():
+    at = run_app(page="Terms & privacy")
+    assert not at.exception
+    text = " ".join(m.value for m in at.markdown)
+    assert "not financial advice" in text.lower() or "nothing here is financial advice" in text.lower()
+    assert "What we collect" in text

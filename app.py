@@ -12,7 +12,7 @@ from src.data import MARKET_TICKER, get_company_info, get_price_history, rank_ma
 from src.grading import CATEGORIES, build_report_card
 from src.metrics import collect_metrics, drawdown_series, growth_of_10k
 
-st.set_page_config(page_title="Stock Report Card", page_icon=":material/monitoring:", layout="wide")
+st.set_page_config(page_title="Stock Report Card", page_icon="assets/favicon.png", layout="wide")
 
 
 def current_theme() -> str:
@@ -71,8 +71,7 @@ PRESETS = {
     "Everyday brands": ["KO", "PEP", "PG", "WMT", "MCD", "NKE"],
 }
 PERIODS = {"1Y": "1y", "3Y": "3y", "5Y": "5y", "10Y": "10y"}
-PAGES = {"Report card": ":material/grading:", "Compare": ":material/compare_arrows:",
-         "Methodology": ":material/functions:"}
+PAGES = ["Report card", "Compare", "Methodology", "Terms & privacy"]
 
 # The page, search and time period live in the URL (e.g. ?page=Compare&q=TSLA),
 # so links can be shared and switching themes doesn't lose your place.
@@ -127,15 +126,14 @@ def use_preset_group():
 
 # ------------------------------------------------------------------ Sidebar
 with st.sidebar:
-    st.markdown("### :material/monitoring: Stock Report Card")
-    page = st.radio("Page", list(PAGES), key="page", format_func=lambda p: f"{PAGES[p]}  {p}",
-                    label_visibility="collapsed")
+    st.markdown("### Stock Report Card")
+    page = st.radio("Page", PAGES, key="page", label_visibility="collapsed")
     st.divider()
     period_label = st.segmented_control("Time period", list(PERIODS), key="period_label",
                                         help="Used for the risk metrics and the charts.")
     period = PERIODS.get(period_label or "5Y")
     st.divider()
-    dark_mode = st.toggle(":material/dark_mode: Dark mode", value=THEME == "dark")
+    dark_mode = st.toggle("Dark mode", value=THEME == "dark")
     if dark_mode != (THEME == "dark"):
         switch_theme("dark" if dark_mode else "light")
     elif st.query_params.get("theme") in ("dark", "light"):
@@ -174,12 +172,15 @@ def report_card_page():
         pick = 0
     ticker = matches[pick]["symbol"]
 
+    placeholder = st.empty()
+    placeholder.html(ui.skeleton_html())  # the shape of the page, until the data arrives
     try:
-        with st.spinner(f"Loading {ticker}..."):
-            info, prices, market_prices, metrics, card = load_stock(ticker, period)
+        info, prices, market_prices, metrics, card = load_stock(ticker, period)
     except Exception as error:
+        placeholder.empty()
         st.error(f"Couldn't load {plain(ticker)}: {plain(error)}")
         return
+    placeholder.empty()
 
     day_change = prices.iloc[-1] / prices.iloc[-2] - 1
     subtitle = " · ".join(x for x in (info.get("sector"), info.get("industry")) if x) or "Fund"
@@ -213,8 +214,7 @@ def report_card_page():
         )
 
     st.subheader("Performance")
-    growth_tab, drawdown_tab = st.tabs([":material/show_chart: Growth of $10,000",
-                                         ":material/trending_down: Drops from peak"])
+    growth_tab, drawdown_tab = st.tabs(["Growth of $10,000", "Drops from peak"])
     with growth_tab:
         st.plotly_chart(
             ui.growth_chart(growth_of_10k(prices), growth_of_10k(market_prices), ticker),
@@ -260,7 +260,7 @@ def compare_page():
     ranked = table[table["Ticker"] != MARKET_TICKER].sort_values("Score", ascending=False)
 
     grade_columns = ["Overall", *CATEGORIES]
-    st.html(ui.podium_html(ranked))
+    st.html(ui.top_three_html(ranked))
     score_columns = [f"{name} score" for name in CATEGORIES]
     st.dataframe(
         ranked.drop(columns=score_columns).style.map(ui.grade_cell_style, subset=grade_columns),
@@ -323,4 +323,34 @@ and a good grade doesn't mean the price will go up.
     )
 
 
-{"Report card": report_card_page, "Compare": compare_page, "Methodology": methodology_page}[page]()
+# ---------------------------------------------------------- Terms & privacy
+def terms_page():
+    st.header("Terms and privacy")
+    st.caption("Last updated November 27, 2026")
+    st.markdown(
+        """
+**What this is.** Stock Report Card is a student project that turns public market data
+into letter grades. It's for learning. Nothing here is financial advice, a recommendation
+to buy or sell anything, or a promise about how a stock will do.
+
+**Where the numbers come from.** Prices and company data come from Yahoo Finance through
+the open-source yfinance library. That data can be late, missing or wrong, and the grades
+are only as good as the data behind them. Yahoo's data is meant for personal use, so please
+don't scrape this site or resell what it shows.
+
+**What we collect.** Nothing that identifies you. There are no accounts, no sign-ups, no ads
+and no analytics on this app. What you type in the search box is sent to Yahoo Finance to
+look up the stock, and it shows up in the page address so links can be shared. Your
+dark or light mode choice is saved in your own browser.
+
+**Hosting.** The app runs on Streamlit Community Cloud, which keeps its own server logs under
+its own privacy policy.
+
+**Questions or problems.** Open an issue on the
+[GitHub repository](https://github.com/GregoryTruong/stock-report-card/issues).
+"""
+    )
+
+
+{"Report card": report_card_page, "Compare": compare_page, "Methodology": methodology_page,
+ "Terms & privacy": terms_page}[page]()
