@@ -4,34 +4,38 @@
 
 [theme]
 showWidgetBorder = true
-baseRadius = "10px"
+baseRadius = "4px"
 font = "IBM Plex Sans:https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
-codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap"
+codeFont = "IBM Plex Mono:https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap"
+headingFont = "Source Serif 4:https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap"
 headingFontWeights = 700
 
-# Late-night dashboard: near-black with electric blue accents.
+# Night: graphite with warm off-white text and a steel blue accent.
 [theme.dark]
-base = "dark"
-primaryColor = "#3B82F6"
-backgroundColor = "#0B0F17"
-secondaryBackgroundColor = "#131A26"
-textColor = "#E6EAF2"
-borderColor = "#1E293B"
+primaryColor = "#8FB3D9"
+backgroundColor = "#17191C"
+secondaryBackgroundColor = "#1E2125"
+textColor = "#E9E5DB"
+borderColor = "#353940"
 
 [theme.dark.sidebar]
-backgroundColor = "#0E131D"
+backgroundColor = "#1B1D20"
 
-# Daytime: soft off-white with the same blue.
+# Day: warm paper with ink-blue accents, like a printed report card.
 [theme.light]
-base = "light"
-primaryColor = "#2563EB"
-backgroundColor = "#F5F7FB"
-secondaryBackgroundColor = "#EAEFF7"
-textColor = "#0F172A"
-borderColor = "#D8DEE9"
+primaryColor = "#1F4E79"
+backgroundColor = "#F3F0E8"
+secondaryBackgroundColor = "#E9E4D9"
+textColor = "#1C1E21"
+borderColor = "#D3CCBE"
 
 [theme.light.sidebar]
-backgroundColor = "#FFFFFF"
+backgroundColor = "#ECE8DE"
 
 [client]
 toolbarMode = "minimal"
+
+# Streamlit sends anonymous usage stats by default. Turn that off so the
+# Terms & privacy page can honestly say the app has no analytics.
+[browser]
+gatherUsageStats = false

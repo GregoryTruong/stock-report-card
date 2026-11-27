@@ -1,5 +1,7 @@
 """Downloads stock data from Yahoo Finance using the yfinance library."""
 
+import re
+
 import pandas as pd
 import yfinance as yf
 
@@ -42,7 +44,11 @@ def get_price_history(ticker: str, period: str = "5y") -> pd.Series:
     if history.empty:
         raise ValueError(f"No price data found for '{ticker}'. Try searching by company name.")
 
-    prices = history["Close"]
+    # Drop missing or broken (zero or negative) closes so they can't turn into $nan or infinity.
+    prices = history["Close"].dropna()
+    prices = prices[prices > 0]
+    if prices.empty:
+        raise ValueError(f"No usable price data for '{ticker}'.")
     # Remove timezone info so dates from different tickers line up cleanly.
     prices.index = prices.index.tz_localize(None)
     prices.name = ticker
@@ -73,15 +79,33 @@ def search_tickers(query: str, limit: int = 8) -> list[dict]:
     ]
 
 
-def rank_matches(query: str, matches: list[dict]) -> list[dict]:
-    """Put an exact ticker match first, adding the query itself if it looks like a ticker.
+def _looks_like_ticker(query: str, matches: list[dict] = ()) -> bool:
+    """AAPL, ea, ATZ.TO and BRK-B look like tickers; "aritzia", "tesla" and "ford" look like names.
 
-    Yahoo's search hides stocks that stopped trading (like EA), so if the query
-    looks like a ticker we always try it directly. That way the user gets a real
-    explanation instead of a different company with a similar name.
+    A short lowercase word like "ea" counts as a ticker, unless a search result's
+    company name starts with it ("ford" -> Ford Motor Company, "nike" -> Nike, Inc.).
+    """
+    text = query.strip()
+    if not text or " " in text or len(text) > 10:
+        return False
+    if text.isupper() or any(c in text for c in ".-^=") or any(c.isdigit() for c in text):
+        return True
+    if len(text) > 4:
+        return False
+    word = text.lower()
+    return not any(re.match(rf"{re.escape(word)}\b", m.get("name", ""), re.IGNORECASE) for m in matches)
+
+
+def rank_matches(query: str, matches: list[dict]) -> list[dict]:
+    """Put an exact ticker match first, and always offer the query itself as a ticker.
+
+    Yahoo's search hides stocks that stopped trading (like EA), so we always let
+    the user try the query directly. It goes first only when it looks like a
+    ticker; for a company name like "aritzia" the real search results go first.
     """
     symbol = query.strip().upper()
-    looks_like_ticker = bool(symbol) and " " not in symbol and len(symbol) <= 10
-    if looks_like_ticker and symbol not in {m["symbol"].upper() for m in matches}:
-        matches = [{"symbol": symbol, "name": "", "exchange": ""}, *matches]
-    return sorted(matches, key=lambda m: m["symbol"].upper() != symbol)
+    ticker_like = _looks_like_ticker(query, matches)
+    if symbol and " " not in symbol and len(symbol) <= 10 and symbol not in {m["symbol"].upper() for m in matches}:
+        raw = {"symbol": symbol, "name": "", "exchange": ""}
+        matches = [raw, *matches] if ticker_like or not matches else [*matches, raw]
+    return sorted(matches, key=lambda m: m["symbol"].upper() != symbol or not ticker_like)

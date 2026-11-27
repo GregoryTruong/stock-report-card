@@ -28,6 +28,10 @@ CATEGORIES = {
     ],
 }
 
+# The overall grade needs data in at least this many of the four categories.
+MIN_CATEGORIES_FOR_OVERALL = 2
+BUSINESS_CATEGORIES = ("Growth", "Profitability")
+
 # One plain-English sentence per category for a high, middle, or low score.
 SUMMARIES = {
     "Growth": (
@@ -127,7 +131,13 @@ def build_report_card(metrics: dict) -> dict:
             "details": details,
         }
 
-    overall_score = _average(c["score"] for c in categories.values())
+    # A fair overall grade needs at least two categories with data, and one of them must
+    # be Growth or Profitability. Funds (like SPY) only have Risk and sometimes a P/E, and
+    # grading them on that alone would let them outrank real companies.
+    scored = [c["score"] for c in categories.values() if c["score"] is not None]
+    has_business_data = any(categories[name]["score"] is not None for name in BUSINESS_CATEGORIES)
+    enough = len(scored) >= MIN_CATEGORIES_FOR_OVERALL and has_business_data
+    overall_score = _average(scored) if enough else None
     return {
         "categories": categories,
         "overall_score": overall_score,

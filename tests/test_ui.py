@@ -3,20 +3,37 @@
 import pandas as pd
 
 from src.grading import build_report_card
-from src.ui import _rgba, grade_chip, podium_html, radar_chart, scorecard_html
+from src.ui import THEMES, _rgba, grade_chip, radar_chart, scorecard_html, top_three_html
 
 
 def test_rgba_converts_hex():
     assert _rgba("#34D399", 0.5) == "rgba(52, 211, 153, 0.5)"
 
 
-def test_grade_chip_uses_grade_color():
-    assert "#34D399" in grade_chip("A")
-    assert "#94A3B8" in grade_chip("something odd")  # unknown grades fall back to gray
+def test_grade_chip_uses_the_current_themes_grade_color():
+    from src import ui
+
+    for mode in ("dark", "light"):
+        ui.set_theme(mode)
+        try:
+            assert THEMES[mode]["GRADE_COLORS"]["A"] in grade_chip("A")
+            assert THEMES[mode]["GRADE_COLORS"]["N/A"] in grade_chip("something odd")
+        finally:
+            ui.set_theme("dark")
+
+
+def test_class_rank_skips_stocks_without_an_overall_grade():
+    ranked = pd.DataFrame([
+        {"Ticker": "AAA", "Company": "Alpha", "Overall": "A", "Score": 90.0},
+        {"Ticker": "FUND", "Company": "Fund", "Overall": "N/A", "Score": None},
+    ])
+    page = top_three_html(ranked)
+    assert "AAA" in page and "FUND" not in page and "nan" not in page  # unknown grades fall back to gray
 
 
 def test_scorecard_shows_verdict_and_every_category():
-    card = build_report_card({"volatility": 0.15, "max_drawdown": -0.15, "beta": 0.8})
+    card = build_report_card({"volatility": 0.15, "max_drawdown": -0.15, "beta": 0.8,
+                              "profit_margin": 0.3, "return_on_equity": 0.4})
     page = scorecard_html(card)
     assert "Top of the class" in page
     for name in ("Growth", "Profitability", "Valuation", "Risk"):
@@ -32,9 +49,9 @@ def _ranked():
     ])
 
 
-def test_podium_puts_winner_in_the_middle_and_shows_top_three():
-    page = podium_html(_ranked())
-    assert page.index("BBB") < page.index("AAA") < page.index("CCC")
+def test_class_rank_lists_the_top_three_in_order():
+    page = top_three_html(_ranked())
+    assert page.index("AAA") < page.index("BBB") < page.index("CCC")
     assert "DDD" not in page
 
 
@@ -69,14 +86,17 @@ def test_light_theme_swaps_colors_only_for_this_thread():
         ui.set_theme("dark")
 
 
-def test_app_uses_line_icons_not_emoji():
+def test_no_emoji_icon_sets_or_decorative_effects():
+    """Guards the look G2 asked for: no emoji, no Lucide icons, no glows, gradients or glass."""
     import re
     from pathlib import Path
 
-    from src.ui import CATEGORY_ICONS, ICONS, icon
-
-    emoji = re.compile("[\U0001F000-\U0001FAFF☀-➿]")
-    for path in ("app.py", "src/ui.py"):
-        assert not emoji.search(Path(path).read_text(encoding="utf-8")), f"emoji found in {path}"
-    assert set(CATEGORY_ICONS.values()) <= set(ICONS)
-    assert 'class="rc-icon rc-i-shield"' in icon("shield")
+    emoji = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF]")
+    banned = ("lucide", ":material/", "box-shadow", "text-shadow", "drop-shadow", "linear-gradient",
+              "radial-gradient", "backdrop-filter", ":hover", "Space Grotesk", "Geist", "\u2014")
+    for path in ("app.py", "src/ui.py", ".streamlit/config.toml"):
+        text = Path(path).read_text(encoding="utf-8")
+        assert not emoji.search(text), f"emoji found in {path}"
+        for word in banned:
+            assert word not in text, f"{word!r} found in {path}"
+        assert not re.search(r"\bInter\b", text), f"the Inter font is used in {path}"

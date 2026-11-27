@@ -1,6 +1,7 @@
 """Stock Report Card: the web app. Run it with:  streamlit run app.py"""
 
 import json
+import re
 
 import pandas as pd
 import streamlit as st
@@ -11,27 +12,50 @@ from src.data import MARKET_TICKER, get_company_info, get_price_history, rank_ma
 from src.grading import CATEGORIES, build_report_card
 from src.metrics import collect_metrics, drawdown_series, growth_of_10k
 
-st.set_page_config(page_title="Stock Report Card", page_icon=":material/monitoring:", layout="wide")
+st.set_page_config(page_title="Stock Report Card", page_icon="assets/favicon.png", layout="wide")
 
 
 def current_theme() -> str:
-    """"dark" or "light": whichever theme Streamlit is showing this visitor."""
+    """"dark" or "light". A ?theme= in the URL wins, because Streamlit's own reading of
+    the theme can be wrong on the first load right after the switch reloads the page."""
+    from_url = st.query_params.get("theme")
+    if from_url in ("dark", "light"):
+        return from_url
     theme_type = getattr(getattr(st.context, "theme", None), "type", None)
     return theme_type if theme_type in ("dark", "light") else "dark"
 
 
+def plain(text) -> str:
+    """Escape Markdown so text from the URL or Yahoo shows as-is (no sneaky links or formatting).
+
+    Every ASCII punctuation mark gets a backslash, which also breaks up bare web
+    addresses like www.example.com so they don't turn into live links.
+    """
+    return re.sub(r"([!-/:-@\[-`{-~])", r"\\\1", str(text))
+
+
 def switch_theme(mode: str):
-    """Flip Streamlit's theme by saving the choice where Streamlit looks for it, then reloading.
+    """Make Streamlit's theme match `mode` by saving it where Streamlit looks, then reloading.
 
     Streamlit has no Python call to change the theme, but it remembers each
     visitor's pick in the browser's localStorage. The page, ticker and time
     period are kept in the URL, so the reload lands right back where you were.
+    It only reloads when the saved theme is different, so it never loops, and it
+    also runs when a shared link carries ?theme=, so the colors always match.
     """
     choice = json.dumps("Dark" if mode == "dark" else "Light")
     components.html(f"""<script>
       const w = window.parent;
-      w.localStorage.setItem(`stActiveTheme-${{w.location.pathname}}-v2`, JSON.stringify({choice}));
-      w.location.reload();
+      const key = `stActiveTheme-${{w.location.pathname}}-v2`;
+      const url = new URL(w.location.href);
+      url.searchParams.set("theme", {json.dumps(mode)});
+      w.history.replaceState(null, "", url.toString());
+      try {{
+        if (w.localStorage.getItem(key) !== JSON.stringify({choice})) {{
+          w.localStorage.setItem(key, JSON.stringify({choice}));
+          w.location.reload();  // a plain reload is allowed from here, navigating isn't
+        }}
+      }} catch (e) {{}}  // storage blocked (private window): keep the page as it is
     </script>""", height=0)
 
 
@@ -47,8 +71,7 @@ PRESETS = {
     "Everyday brands": ["KO", "PEP", "PG", "WMT", "MCD", "NKE"],
 }
 PERIODS = {"1Y": "1y", "3Y": "3y", "5Y": "5y", "10Y": "10y"}
-PAGES = {"Report card": ":material/grading:", "Compare": ":material/compare_arrows:",
-         "Methodology": ":material/functions:"}
+PAGES = ["Report card", "Compare", "Methodology", "Terms & privacy"]
 
 # The page, search and time period live in the URL (e.g. ?page=Compare&q=TSLA),
 # so links can be shared and switching themes doesn't lose your place.
@@ -103,17 +126,18 @@ def use_preset_group():
 
 # ------------------------------------------------------------------ Sidebar
 with st.sidebar:
-    st.markdown("### :material/monitoring: Stock Report Card")
-    page = st.radio("Page", list(PAGES), key="page", format_func=lambda p: f"{PAGES[p]}  {p}",
-                    label_visibility="collapsed")
+    st.markdown("### Stock Report Card")
+    page = st.radio("Page", PAGES, key="page", label_visibility="collapsed")
     st.divider()
     period_label = st.segmented_control("Time period", list(PERIODS), key="period_label",
                                         help="Used for the risk metrics and the charts.")
     period = PERIODS.get(period_label or "5Y")
     st.divider()
-    dark_mode = st.toggle(":material/dark_mode: Dark mode", value=THEME == "dark")
+    dark_mode = st.toggle("Dark mode", value=THEME == "dark")
     if dark_mode != (THEME == "dark"):
         switch_theme("dark" if dark_mode else "light")
+    elif st.query_params.get("theme") in ("dark", "light"):
+        switch_theme(THEME)  # a shared link with ?theme= : bring Streamlit's own theme in line
     st.caption("For learning purposes only. Not financial advice.")
 
 st.query_params.update(page=page, period=period_label or "5Y", q=st.session_state.query)
@@ -136,7 +160,7 @@ def report_card_page():
         return
     matches = find_stocks(query)
     if not matches:
-        st.warning(f'No stocks found for "{query}". Try the full company name or a ticker.')
+        st.warning(f'No stocks found for "{plain(query)}". Try the full company name or a ticker.')
         return
     if len(matches) > 1:
         pick = st.selectbox(
@@ -148,12 +172,15 @@ def report_card_page():
         pick = 0
     ticker = matches[pick]["symbol"]
 
+    placeholder = st.empty()
+    placeholder.html(ui.skeleton_html())  # the shape of the page, until the data arrives
     try:
-        with st.spinner(f"Loading {ticker}..."):
-            info, prices, market_prices, metrics, card = load_stock(ticker, period)
+        info, prices, market_prices, metrics, card = load_stock(ticker, period)
     except Exception as error:
-        st.error(f"Couldn't load {ticker}: {error}")
+        placeholder.empty()
+        st.error(f"Couldn't load {plain(ticker)}: {plain(error)}")
         return
+    placeholder.empty()
 
     day_change = prices.iloc[-1] / prices.iloc[-2] - 1
     subtitle = " · ".join(x for x in (info.get("sector"), info.get("industry")) if x) or "Fund"
@@ -181,23 +208,22 @@ def report_card_page():
             for detail in category["details"]
         ]
         st.dataframe(
-            pd.DataFrame(rows), hide_index=True, use_container_width=True,
+            pd.DataFrame(rows), hide_index=True, width="stretch",
             column_config={"Score": st.column_config.ProgressColumn(
                 min_value=0, max_value=100, format="%.0f")},
         )
 
     st.subheader("Performance")
-    growth_tab, drawdown_tab = st.tabs([":material/show_chart: Growth of $10,000",
-                                         ":material/trending_down: Drops from peak"])
+    growth_tab, drawdown_tab = st.tabs(["Growth of $10,000", "Drops from peak"])
     with growth_tab:
         st.plotly_chart(
             ui.growth_chart(growth_of_10k(prices), growth_of_10k(market_prices), ticker),
-            use_container_width=True,
+            width="stretch",
         )
     with drawdown_tab:
         st.caption("How far below its highest price the stock was on each day. "
                    "0% means it was at a high.")
-        st.plotly_chart(ui.drawdown_chart(drawdown_series(prices)), use_container_width=True)
+        st.plotly_chart(ui.drawdown_chart(drawdown_series(prices)), width="stretch")
 
 
 # ------------------------------------------------------------------ Compare
@@ -218,10 +244,10 @@ def compare_page():
             try:
                 info, _, _, metrics, card = load_stock(t, period)
             except Exception as error:
-                st.warning(f"Skipped {t}: {error}")
+                st.warning(f"Skipped {plain(t)}: {plain(error)}")
                 continue
             row = {"Ticker": t, "Company": info.get("shortName") or t,
-                   "Overall": card["overall_grade"], "Score": card["overall_score"] or 0}
+                   "Overall": card["overall_grade"], "Score": card["overall_score"]}
             row.update({name: c["grade"] for name, c in card["categories"].items()})
             row.update({f"{name} score": c["score"] for name, c in card["categories"].items()})
             row["Yearly return"] = metrics["annual_return"]
@@ -231,14 +257,14 @@ def compare_page():
     if not rows:
         return
     table = pd.DataFrame(rows)
-    ranked = table[table["Ticker"] != MARKET_TICKER].sort_values("Score", ascending=False)
+    ranked = table[table["Ticker"] != MARKET_TICKER].sort_values("Score", ascending=False, na_position="last")
 
     grade_columns = ["Overall", *CATEGORIES]
-    st.html(ui.podium_html(ranked))
+    st.html(ui.top_three_html(ranked))
     score_columns = [f"{name} score" for name in CATEGORIES]
     st.dataframe(
         ranked.drop(columns=score_columns).style.map(ui.grade_cell_style, subset=grade_columns),
-        hide_index=True, use_container_width=True,
+        hide_index=True, width="stretch",
         column_config={
             "Score": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.0f"),
             "Yearly return": st.column_config.NumberColumn(format="percent"),
@@ -250,12 +276,12 @@ def compare_page():
     st.caption("Each dot is a stock. Higher is better return, further right is a bumpier ride. "
                "The gray dot is the S&P 500, so anything above and left of it beat the "
                "market with less risk.")
-    st.plotly_chart(ui.risk_return_chart(table), use_container_width=True)
+    st.plotly_chart(ui.risk_return_chart(table), width="stretch")
 
     st.subheader("Strengths at a glance")
     st.caption("Each shape shows a stock's four category scores. The bigger the shape, the better "
                "the all-round grade. Click names in the legend to hide or show them.")
-    st.plotly_chart(ui.radar_chart(ranked, list(CATEGORIES)), use_container_width=True)
+    st.plotly_chart(ui.radar_chart(ranked, list(CATEGORIES)), width="stretch")
 
 
 # -------------------------------------------------------------- Methodology
@@ -277,7 +303,7 @@ the overall grade is the average of the four categories.
         for label, _, worst, best, kind in rules
     ]
     st.subheader("Cutoffs")
-    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     st.markdown(
         """
 **Growth:** is the company selling more and earning more than last year?
@@ -297,4 +323,36 @@ and a good grade doesn't mean the price will go up.
     )
 
 
-{"Report card": report_card_page, "Compare": compare_page, "Methodology": methodology_page}[page]()
+# ---------------------------------------------------------- Terms & privacy
+def terms_page():
+    st.header("Terms and privacy")
+    st.caption("Last updated November 27, 2026")
+    st.markdown(
+        """
+**What this is.** Stock Report Card is a student project that turns public market data
+into letter grades. It's for learning. Nothing here is financial advice, a recommendation
+to buy or sell anything, or a promise about how a stock will do.
+
+**Where the numbers come from.** Prices and company data come from Yahoo Finance through
+the open-source yfinance library. That data can be late, missing or wrong, and the grades
+are only as good as the data behind them. Yahoo's data is meant for personal use, so please
+don't scrape this site or resell what it shows.
+
+**What the app collects.** Nothing that identifies you. There are no accounts, no sign-ups
+and no ads, and the app doesn't add any tracking or analytics of its own (Streamlit's usage
+stats are switched off). What you type in the search box is sent to Yahoo Finance to
+look up the stock, and it shows up in the page address so links can be shared. Your
+dark or light mode choice is saved in your own browser.
+
+**Hosting.** The app runs on Streamlit Community Cloud. Streamlit keeps its own server logs,
+and if you're signed in to Streamlit it may show the app owner that you viewed the app. That
+part is covered by Streamlit's privacy policy, not this page.
+
+**Questions or problems.** Open an issue on the
+[GitHub repository](https://github.com/GregoryTruong/stock-report-card/issues).
+"""
+    )
+
+
+{"Report card": report_card_page, "Compare": compare_page, "Methodology": methodology_page,
+ "Terms & privacy": terms_page}[page]()
