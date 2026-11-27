@@ -36,8 +36,8 @@ COMPANIES = {
     "ATZ.TO": {"longName": "Aritzia Inc.", "sector": "Consumer Cyclical", "industry": "Apparel Retail",
                "currency": "CAD", "marketCap": 6e9, "revenueGrowth": 0.1, "profitMargins": 0.05,
                "trailingPE": 45.0},
-    "SHOP.TO": {"longName": "Shopify Inc.", "sector": "Technology", "industry": "Software", "currency": "CAD",
-                "marketCap": 2e11, "revenueGrowth": 0.25, "profitMargins": 0.15, "trailingPE": 80.0},
+    "NVDA": {"longName": "NVIDIA Corporation", "sector": "Technology", "industry": "Semiconductors",
+             "currency": "USD", "marketCap": 4e12, "revenueGrowth": 0.6, "profitMargins": 0.5, "trailingPE": 50.0},
     # Yahoo sometimes returns keys with empty values.
     "BLANK": {"longName": None, "shortName": None, "currency": None, "sector": None},
 }
@@ -171,7 +171,7 @@ def test_terms_and_privacy_page_loads():
 def test_opens_on_a_watchlist_stock_with_its_note():
     at = run_app()
     assert not at.exception
-    assert at.text_input(key="query").value == "SHOP.TO"
+    assert at.text_input(key="query").value == "NVDA"
     assert any("On my watchlist" in c.value for c in at.caption)
 
 

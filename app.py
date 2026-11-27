@@ -63,12 +63,15 @@ THEME = current_theme()
 ui.set_theme(THEME)
 st.html(ui.css())
 
-# Stocks I keep an eye on, picked from the things I'm into, with the reason for each.
+# Stocks and funds I follow, with a short note on what each one is.
 WATCHLIST = {
-    "SHOP.TO": "Tech. Shopify is a Canadian online store platform.",
-    "NVDA": "Tech and gaming. Nvidia makes GeForce graphics cards and AI chips.",
-    "SONY": "Gaming. Sony makes the PlayStation.",
-    "RACE": "Cars. Ferrari.",
+    "NVDA": "Nvidia. Graphics cards for gaming, and the chips behind most AI data centers.",
+    "MU": "Micron. Memory chips: the RAM and storage in phones, PCs and AI servers.",
+    "VST": "Vistra. A US power company running gas, nuclear and solar plants.",
+    "OKLO": "Oklo. A nuclear startup designing small reactors. No sales yet, so expect low grades.",
+    "VFV.TO": "Vanguard S&P 500 index fund, in Canadian dollars. Funds don't get an overall grade.",
+    "QQC.TO": "A Nasdaq 100 index fund, in Canadian dollars. Funds don't get an overall grade.",
+    "XEQT.TO": "iShares all-equity fund: thousands of stocks worldwide in one. Funds don't get an overall grade.",
 }
 
 # Ready-made groups of tickers so people can explore without knowing symbols.
@@ -85,7 +88,7 @@ grew. Before putting money into a stock, I wanted a quick way to tell whether th
 behind it was actually any good. So I picked four things analysts look at, set a cutoff
 for each, and made the app explain every grade in plain English.
 
-The watchlist is made of companies from things I'm into: tech, cars and gaming.
+The watchlist is the mix of stocks and index funds I actually follow.
 """
 PERIODS = {"1Y": "1y", "3Y": "3y", "5Y": "5y", "10Y": "10y"}
 PAGES = ["Report card", "Compare", "Methodology", "Terms & privacy"]
@@ -94,7 +97,7 @@ PAGES = ["Report card", "Compare", "Methodology", "Terms & privacy"]
 # so links can be shared and switching themes doesn't lose your place.
 params = st.query_params
 if "query" not in st.session_state:
-    st.session_state.query = params.get("q", "SHOP.TO")
+    st.session_state.query = params.get("q", "NVDA")
 if "page" not in st.session_state:
     st.session_state.page = params.get("page") if params.get("page") in PAGES else "Report card"
 if "period_label" not in st.session_state:
