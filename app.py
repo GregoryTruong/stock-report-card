@@ -65,12 +65,10 @@ st.html(ui.css())
 
 # Stocks I keep an eye on, picked from the things I'm into, with the reason for each.
 WATCHLIST = {
-    "ATZ.TO": "Fashion. Aritzia is a Canadian clothing brand.",
     "SHOP.TO": "Tech. Shopify is a Canadian online store platform.",
     "NVDA": "Tech and gaming. Nvidia makes GeForce graphics cards and AI chips.",
     "SONY": "Gaming. Sony makes the PlayStation.",
     "RACE": "Cars. Ferrari.",
-    "NKE": "Sports and fashion. Nike.",
 }
 
 # Ready-made groups of tickers so people can explore without knowing symbols.
@@ -87,8 +85,7 @@ grew. Before putting money into a stock, I wanted a quick way to tell whether th
 behind it was actually any good. So I picked four things analysts look at, set a cutoff
 for each, and made the app explain every grade in plain English.
 
-The watchlist is made of companies from things I'm into: tech, cars, sports, fashion
-and gaming.
+The watchlist is made of companies from things I'm into: tech, cars and gaming.
 """
 PERIODS = {"1Y": "1y", "3Y": "3y", "5Y": "5y", "10Y": "10y"}
 PAGES = ["Report card", "Compare", "Methodology", "Terms & privacy"]
@@ -97,7 +94,7 @@ PAGES = ["Report card", "Compare", "Methodology", "Terms & privacy"]
 # so links can be shared and switching themes doesn't lose your place.
 params = st.query_params
 if "query" not in st.session_state:
-    st.session_state.query = params.get("q", "ATZ.TO")
+    st.session_state.query = params.get("q", "SHOP.TO")
 if "page" not in st.session_state:
     st.session_state.page = params.get("page") if params.get("page") in PAGES else "Report card"
 if "period_label" not in st.session_state:

@@ -20,7 +20,7 @@ I wanted to open a TFSA and stop leaving my money in a savings account where it 
 grew. Before putting money into a stock, I wanted a quick way to tell whether the company
 behind it was actually any good. So I picked four things analysts look at, set a cutoff for
 each, and made the app explain every grade in plain English. The app opens on my watchlist,
-which is made of companies from things I'm into: tech, cars, sports, fashion and gaming.
+which is made of companies from things I'm into: tech, cars and gaming.
 
 ## What's in it
 
@@ -30,7 +30,7 @@ which is made of companies from things I'm into: tech, cars, sports, fashion and
   amount in the S&P 500.
 - **Drops from peak:** how far the stock fell below its high, day by day.
 - **Compare:** rank a list of tickers, with a risk vs. return chart.
-- **My watchlist:** Aritzia, Shopify, Nvidia, Sony, Ferrari and Nike, each with a note on
+- **My watchlist:** Shopify, Nvidia, Sony and Ferrari, each with a note on
   why it's there. The Methodology page explains why I picked each cutoff.
 - **Dark and light mode**, and links that keep your stock, page and time period.
 
